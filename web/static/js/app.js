@@ -459,6 +459,50 @@
       .join("");
   }
 
+  const BLOCO_VISUAL = {
+    reforma: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2zm2 4h6v2H9V7zm0 4h6v2H9v-2z"/></svg>',
+    },
+    restauro: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3zm-1 14-4-4 1.4-1.4L11 13.2l4.6-4.6L17 10l-6 6z"/></svg>',
+    },
+    aquisicao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm8.3 12.9 3.4 3.4-1.4 1.4-3.4-3.4A8 8 0 1 1 10 2a8 8 0 0 1 8.3 14.9z"/></svg>',
+    },
+    comunicacao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v12H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z"/></svg>',
+    },
+    inauguracao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm13 8H4v10h16V10zM8 12h3v3H8v-3zm5 0h3v3h-3v-3z"/></svg>',
+    },
+    parcerias: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3c2.5 2.2 4 4.7 4 7.2A4 4 0 0 1 8 10.2C8 7.7 9.5 5.2 12 3zm-7 9a3.5 3.5 0 0 1 3.5 3.5V18H2v-2.5A3.5 3.5 0 0 1 5 12zm14 0a3.5 3.5 0 0 1 3.5 3.5V18h-6.5v-2.5A3.5 3.5 0 0 1 19 12zM12 13a3 3 0 0 1 3 3V18H9v-2a3 3 0 0 1 3-3z"/></svg>',
+    },
+    mudanca: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>',
+    },
+    outras: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>',
+    },
+  };
+
+  function blocoVisual(blocoId) {
+    return (
+      BLOCO_VISUAL[blocoId] || {
+        tone: "green",
+        icon: BLOCO_VISUAL.outras.icon,
+      }
+    );
+  }
+
   function renderBlocks() {
     const frentes = state.frentes || [];
     el.frenteTag.textContent = `${frentes.length} frentes`;
@@ -469,12 +513,17 @@
     el.blocks.innerHTML = frentes
       .map((f) => {
         const active = state.bloco === f.bloco ? " is-active" : "";
+        const visual = blocoVisual(f.bloco);
+        const doneCls = Number(f.concluidos) > 0 ? " has-progress" : "";
         return `
-        <button type="button" class="block${active}" data-bloco="${escapeAttr(f.bloco)}">
+        <button type="button" class="block block-${visual.tone}${active}" data-bloco="${escapeAttr(f.bloco)}">
           <div class="block-top">
-            <div>
-              <div class="block-name">${escapeHtml(f.frente)}</div>
-              <div class="block-alt">${escapeHtml(f.bloco_label || "")}</div>
+            <div class="block-heading">
+              <span class="block-icon">${visual.icon}</span>
+              <div class="block-titles">
+                <div class="block-name">${escapeHtml(f.frente)}</div>
+                <div class="block-alt">${escapeHtml(f.bloco_label || "")}</div>
+              </div>
             </div>
             <div class="block-count">${f.total} itens</div>
           </div>
@@ -508,7 +557,7 @@
           </div>
           <div class="block-foot">
             <span>Concluído</span>
-            <b>${f.concluidos}/${f.total}</b>
+            <b class="block-ratio${doneCls}"><span>${f.concluidos}</span>/${f.total}</b>
           </div>
         </button>`;
       })

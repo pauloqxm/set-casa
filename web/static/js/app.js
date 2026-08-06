@@ -400,7 +400,6 @@
         value: k.concluidos ?? 0,
         text: "Itens finalizados",
         status: `Progresso ${k.progresso_pct ?? 0}%`,
-        concluido: true,
       },
       {
         id: "andamento",
@@ -438,7 +437,7 @@
         text: "Críticas abertas e prazos vencidos",
         status: "Atenção",
       },
-    ].filter((c) => state.showConcluidos || !c.concluido);
+    ];
 
     el.kpis.dataset.count = String(cards.length);
     el.kpis.innerHTML = cards

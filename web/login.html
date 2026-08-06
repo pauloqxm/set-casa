@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login · Casa do Trabalhador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+  </head>
+  <body class="auth-body">
+    <main class="login-card" aria-labelledby="loginTitle">
+      <div class="login-logos" aria-label="Logos institucionais">
+        <img
+          class="logo logo-set"
+          src="/static/img/logo-set.jpg"
+          alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+          width="120"
+          height="120"
+        />
+        <img
+          class="logo logo-idt"
+          src="/static/img/logo-idt.png"
+          alt="Instituto de Desenvolvimento do Trabalho"
+          width="220"
+          height="72"
+        />
+      </div>
+      <hr class="login-divider" />
+      <h1 id="loginTitle">Casa do Trabalhador</h1>
+      <p class="login-sub">Acesso restrito ao painel</p>
+
+      <form id="loginForm" autocomplete="on">
+        <label>
+          Usuário
+          <input
+            id="loginUsuario"
+            name="usuario"
+            type="text"
+            placeholder="Digite o usuário"
+            required
+            autofocus
+            autocomplete="username"
+          />
+        </label>
+        <label>
+          Senha
+          <span class="password-wrap">
+            <input
+              id="loginSenha"
+              name="senha"
+              type="password"
+              placeholder="Digite a senha"
+              required
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              id="toggleSenha"
+              aria-label="Mostrar senha"
+              title="Mostrar senha"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 5c-5 0-9.27 3.11-11 7 1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 9z"
+                />
+              </svg>
+            </button>
+          </span>
+        </label>
+        <p class="login-error" id="loginError" hidden></p>
+        <button type="submit" class="btn-login" id="loginSubmit">Entrar</button>
+      </form>
+    </main>
+    <script src="/static/js/login.js"></script>
+  </body>
+</html>

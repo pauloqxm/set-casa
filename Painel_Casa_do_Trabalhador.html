@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casa do Trabalhador — Painel de Acompanhamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0F2438;
+    --steel:#3C6E96;
+    --steel-light:#EAF1F6;
+    --amber:#E8A020;
+    --amber-dark:#B87611;
+    --concrete:#7C8494;
+    --paper:#F1EFE9;
+    --card:#FFFFFF;
+    --line:#DCD8CE;
+    --green:#3C8D5C;
+    --green-bg:#E7F3EC;
+    --red:#C1443C;
+    --red-bg:#FBEAE8;
+    --gray-bg:#EDEDEA;
+    --blue-bg:#E7EFF6;
+    --purple:#7C5CBF;
+    --purple-bg:#F0EBFA;
+    --text:#1B2733;
+    --muted:#697080;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Barlow', sans-serif;
+    font-size:15px;
+    line-height:1.4;
+  }
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 24px 60px;}
+
+  /* ---------- HEADER (blueprint style) ---------- */
+  header.top{
+    background:var(--ink);
+    color:#fff;
+    border-radius:var(--radius);
+    padding:26px 30px 22px;
+    position:relative;
+    overflow:hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.055) 1px, transparent 1px);
+    background-size:24px 24px;
+  }
+  header.top::after{
+    content:"";
+    position:absolute; inset:0;
+    background:linear-gradient(115deg, rgba(15,36,56,0.0) 40%, rgba(15,36,56,0.92) 100%), radial-gradient(circle at 88% -10%, rgba(232,160,32,0.35), transparent 55%);
+    pointer-events:none;
+  }
+  .top-inner{position:relative; z-index:1; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:18px;}
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--amber); font-weight:600; margin-bottom:8px;
+  }
+  h1{
+    font-family:'Archivo Expanded', sans-serif;
+    font-weight:800;
+    font-size:30px;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .sub{color:#B9C3CE; font-size:14px; max-width:560px;}
+  .top-meta{
+    display:flex; gap:26px; align-items:center;
+  }
+  .ring-wrap{display:flex; flex-direction:column; align-items:center; gap:2px;}
+  .ring-num{font-family:'Archivo Expanded'; font-size:15px; font-weight:800; fill:#fff;}
+  .ring-label{font-family:'JetBrains Mono', monospace; font-size:9.5px; color:#B9C3CE; letter-spacing:.08em; text-transform:uppercase;}
+  .updated{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:#8FA0AF;
+    border-left:2px solid rgba(255,255,255,0.18); padding-left:14px;
+  }
+
+  /* ---------- KPI ROW ---------- */
+  .kpis{display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-top:18px;}
+  .kpi{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 14px 12px; position:relative; overflow:hidden;
+  }
+  .kpi::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--bar,#ccc);}
+  .kpi .num{font-family:'Archivo Expanded'; font-size:26px; font-weight:800; color:var(--ink); line-height:1;}
+  .kpi .lbl{font-size:12px; color:var(--muted); margin-top:6px; font-weight:600;}
+  .kpi.total{--bar:var(--ink);}
+  .kpi.done{--bar:var(--green);}
+  .kpi.progress{--bar:var(--steel);}
+  .kpi.waiting{--bar:var(--amber);}
+  .kpi.notstarted{--bar:var(--concrete);}
+  .kpi.critical{--bar:var(--red);}
+
+  /* ---------- SECTION TITLES ---------- */
+  .section-title{
+    display:flex; align-items:baseline; gap:10px; margin:34px 0 14px;
+  }
+  .section-title h2{
+    font-family:'Archivo Expanded'; font-size:16px; text-transform:uppercase; letter-spacing:.05em;
+    margin:0; color:var(--ink);
+  }
+  .section-title .tag{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--concrete);
+    background:var(--gray-bg); padding:2px 8px; border-radius:20px;
+  }
+  .section-title .rule{flex:1; height:1px; background:var(--line);}
+
+  /* ---------- BLOCOS (frentes) ---------- */
+  .blocks{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:12px;}
+  .block{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px 15px; cursor:pointer; transition:box-shadow .15s, border-color .15s, transform .1s;
+  }
+  .block:hover{box-shadow:0 4px 14px rgba(15,36,56,0.10); transform:translateY(-1px);}
+  .block.active{border-color:var(--steel); box-shadow:0 0 0 2px var(--steel-light) inset, 0 4px 14px rgba(15,36,56,0.10);}
+  .block-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .block-name{font-weight:700; font-size:13.5px; color:var(--ink); line-height:1.25;}
+  .block-count{font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); white-space:nowrap;}
+  .block-alt{font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--amber-dark); text-transform:uppercase; letter-spacing:.06em; margin-top:2px;}
+  .block-bar{height:6px; border-radius:4px; background:var(--gray-bg); margin-top:11px; overflow:hidden; display:flex;}
+  .block-bar span{height:100%;}
+  .block-foot{display:flex; justify-content:space-between; margin-top:7px; font-size:11px; color:var(--muted);}
+  .block-foot b{color:var(--ink); font-weight:700;}
+
+  /* ---------- RADAR CRITICO ---------- */
+  .radar{display:flex; flex-direction:column; gap:8px;}
+  .radar-item{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--red);
+    border-radius:8px; padding:11px 14px; display:grid; grid-template-columns:auto 1fr auto auto auto; gap:16px; align-items:center;
+  }
+  .radar-item.warn{border-left-color:var(--amber);}
+  .radar-id{font-family:'JetBrains Mono'; font-size:11px; color:var(--muted);}
+  .radar-name{font-weight:600; font-size:13.5px;}
+  .radar-frente{font-size:11px; color:var(--muted);}
+  .radar-days{font-family:'JetBrains Mono'; font-size:11.5px; font-weight:600; white-space:nowrap;}
+  .radar-days.late{color:var(--red);}
+  .radar-days.soon{color:var(--amber-dark);}
+  .radar-resp{font-size:11.5px; color:var(--steel); font-weight:600; white-space:nowrap;}
+  .radar-next{font-size:12px; color:var(--muted); grid-column:2/3; margin-top:-4px;}
+  .radar-empty{color:var(--muted); font-size:13px; padding:14px; text-align:center; background:var(--card); border:1px dashed var(--line); border-radius:8px;}
+
+  /* ---------- FILTERS ---------- */
+  .filters{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 14px; margin-top:14px;
+  }
+  .filters select, .filters input[type=text]{
+    font-family:'Barlow'; font-size:13px; padding:7px 10px; border-radius:7px; border:1px solid var(--line);
+    background:#fff; color:var(--text); min-width:130px;
+  }
+  .filters input[type=text]{min-width:220px; flex:1;}
+  .filters .clear{
+    font-family:'JetBrains Mono'; font-size:11px; color:var(--steel); cursor:pointer; background:var(--steel-light);
+    border:none; padding:7px 12px; border-radius:7px; font-weight:600;
+  }
+  .filters .clear:hover{background:#dfe9f1;}
+  .count-showing{font-size:12px; color:var(--muted); margin-left:auto; white-space:nowrap;}
+
+  /* ---------- TABLE ---------- */
+  .table-scroll{margin-top:12px; border:1px solid var(--line); border-radius:var(--radius); overflow:auto; background:var(--card);}
+  table{border-collapse:collapse; width:100%; min-width:1100px; font-size:13px;}
+  thead th{
+    position:sticky; top:0; background:var(--ink); color:#fff; text-align:left; padding:10px 12px;
+    font-family:'JetBrains Mono'; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; font-weight:600;
+    cursor:pointer; user-select:none; white-space:nowrap;
+  }
+  thead th:hover{background:#193049;}
+  thead th.sorted::after{content:" ▾"; color:var(--amber);}
+  tbody tr{border-top:1px solid var(--line);}
+  tbody tr:hover{background:var(--paper);}
+  tbody tr.overdue{background:var(--red-bg);}
+  tbody tr.overdue:hover{background:#f7dcd9;}
+  td{padding:9px 12px; vertical-align:top;}
+  td.id{font-family:'JetBrains Mono'; color:var(--muted); font-size:11.5px;}
+  td.entrega{font-weight:600; color:var(--ink); max-width:230px;}
+  td.frente-cell{font-size:12px; color:var(--muted); max-width:150px;}
+  td.prazo{font-family:'JetBrains Mono'; font-size:12px; white-space:nowrap;}
+  td.prazo.late{color:var(--red); font-weight:700;}
+  td.next{font-size:12px; color:var(--muted); max-width:230px;}
+  td.resp{font-size:12px; font-weight:600; color:var(--steel);}
+  td.parc{font-size:11.5px; color:var(--muted); max-width:140px;}
+
+  .badge{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap;}
+  .st-Concluído{background:var(--green-bg); color:var(--green);}
+  .st-Em_andamento{background:var(--blue-bg); color:var(--steel);}
+  .st-Aguardando_terceiros{background:#FCEFD9; color:var(--amber-dark);}
+  .st-Não_iniciado{background:var(--gray-bg); color:var(--concrete);}
+  .st-Sobrestado{background:var(--purple-bg); color:var(--purple);}
+  .st-Não_se_aplica{background:var(--gray-bg); color:var(--concrete);}
+  .st-none{background:var(--gray-bg); color:var(--concrete);}
+
+  .prio{font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:5px;}
+  .prio::before{content:""; width:7px; height:7px; border-radius:50%; display:inline-block;}
+  .prio-Crítica::before{background:var(--red);}
+  .prio-Crítica{color:var(--red);}
+  .prio-Alta::before{background:var(--amber-dark);}
+  .prio-Alta{color:var(--amber-dark);}
+  .prio-Média::before{background:var(--steel);}
+  .prio-Média{color:var(--steel);}
+  .prio-Baixa::before{background:var(--concrete);}
+  .prio-Baixa{color:var(--concrete);}
+  .prio-none::before{background:var(--line);}
+  .prio-none{color:var(--muted);}
+
+  footer{margin-top:36px; text-align:center; font-size:11.5px; color:var(--muted); font-family:'JetBrains Mono';}
+
+  @media (max-width: 980px){
+    .kpis{grid-template-columns:repeat(3,1fr);}
+    .top-inner{flex-direction:column; align-items:flex-start;}
+  }
+  @media (max-width: 600px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .wrap{padding:16px 12px 40px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="top-inner">
+      <div>
+        <div class="eyebrow">SET · Secretaria do Trabalho — Ceará</div>
+        <h1>Casa do Trabalhador</h1>
+        <div class="sub">Painel de acompanhamento das entregas até a inauguração. Reforma, restauro, aquisições, comunicação e implantação dos serviços em um único radar.</div>
+      </div>
+      <div class="top-meta">
+        <svg width="76" height="76" viewBox="0 0 76 76" id="ringSvg">
+          <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="8"/>
+          <circle id="ringProgress" cx="38" cy="38" r="32" fill="none" stroke="#E8A020" stroke-width="8" stroke-linecap="round" transform="rotate(-90 38 38)"/>
+          <text x="38" y="34" text-anchor="middle" class="ring-num" id="ringPct">0%</text>
+          <text x="38" y="47" text-anchor="middle" class="ring-label" font-family="JetBrains Mono" font-size="8" fill="#B9C3CE">CONCLUÍDO</text>
+        </svg>
+        <div class="updated">DADOS<br>REF. AGO/2026<br>INAUGURAÇÃO<br>26/11/2026</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <div class="section-title">
+    <h2>Frentes de trabalho</h2>
+    <span class="tag" id="frenteTag">10 blocos</span>
+    <div class="rule"></div>
+  </div>
+  <div class="blocks" id="blocksRow"></div>
+
+  <div class="section-title">
+    <h2>Radar crítico — o que precisa de providência agora</h2>
+    <span class="tag">prioridade crítica/alta em aberto</span>
+    <div class="rule"></div>
+  </div>
+  <div class="radar" id="radarList"></div>
+
+  <div class="section-title">
+    <h2>Todas as ações</h2>
+    <span class="tag" id="tableTag">94 itens</span>
+    <div class="rule"></div>
+  </div>
+
+  <div class="filters">
+    <select id="fFrente"><option value="">Todas as frentes</option></select>
+    <select id="fStatus"><option value="">Todos os status</option></select>
+    <select id="fPrio"><option value="">Todas as prioridades</option></select>
+    <select id="fResp"><option value="">Todos os responsáveis</option></select>
+    <input type="text" id="fSearch" placeholder="Buscar ação, parceiro, observação...">
+    <button class="clear" id="clearFilters">LIMPAR FILTROS</button>
+    <span class="count-showing" id="countShowing"></span>
+  </div>
+
+  <div class="table-scroll">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th data-key="id">ID</th>
+          <th data-key="frente">Frente</th>
+          <th data-key="entrega">Entrega / Ação</th>
+          <th data-key="responsavel">Responsável</th>
+          <th data-key="parceiros">Parceiros</th>
+          <th data-key="prioridade">Prioridade</th>
+          <th data-key="prazo">Prazo</th>
+          <th data-key="status">Status</th>
+          <th data-key="proxima">Próxima providência</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <footer>PAINEL GERADO A PARTIR DA PLANILHA DE MONITORAMENTO · CASA DO TRABALHADOR · SET-CE</footer>
+</div>
+
+<script id="rawData" type="application/json">
+[{"id": "001", "frente": "Infraestrutura", "entrega": "Pintura e iluminação da fachada", "inicio": "2026-04-01", "nup": null, "responsavel": "KG", "parceiros": "KG/SOP", "prioridade": "Alta", "prazo": "2026-10-30", "status": "Aguardando terceiros", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "002", "frente": "Infraestrutura", "entrega": "Conclusão da Escada, já compatibilizada com a plataforma elevatória", "inicio": "2026-04-01", "nup": null, "responsavel": "KG", "parceiros": "KG/SOP", "prioridade": "Crítica", "prazo": "2026-08-31", "status": "Em andamento", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "003", "frente": "Infraestrutura", "entrega": "Aumento de carga ENEL", "inicio": "2026-03-17", "nup": "59000.000612/2026-92", "responsavel": "SET- COTRA/COAFI", "parceiros": "ENEL", "prioridade": "Alta", "prazo": "2026-09-17", "status": "Aguardando terceiros", "proxima": "padrão substituido, feita a liberação de ordem da ENEL, ate o dia 11/08 equipe retorna ao local", "obs": "OS 998809560"}, {"id": "004", "frente": "Infraestrutura", "entrega": "Nova ligação elétrica para o pavimento superior", "inicio": "2026-03-17", "nup": "59000.000612/2026-92", "responsavel": "IDT", "parceiros": "ENEL", "prioridade": "Crítica", "prazo": "2026-09-17", "status": "Aguardando terceiros", "proxima": "intalar caixa de medidor, eletrodutos e disjuntor", "obs": null}, {"id": "005", "frente": "Restauro e Patrimônio Histórico", "entrega": "Aprovação junto ao IPHAN", "inicio": "2026-02-10", "nup": "59000.000229/2026-34", "responsavel": "Karol", "parceiros": "IPHAN", "prioridade": "Baixa", "prazo": "2026-02-24", "status": "Concluído", "proxima": null, "obs": "Parecer Técnico n o 13/2026/DIVTEC IPHAN-CE/IPHAN (PROJETOS)"}, {"id": "006", "frente": "Restauro e Patrimônio Histórico", "entrega": "Acompanhamento das aulas/restauro", "inicio": "2026-06-01", "nup": null, "responsavel": "Karol", "parceiros": "EAOTPS", "prioridade": "Baixa", "prazo": "2026-11-26", "status": "Não se aplica", "proxima": "fazer a conservação de fragmento; criar um testemunho ou janela arqueológica", "obs": null}, {"id": "007", "frente": "Restauro e Patrimônio Histórico", "entrega": "Aprovação junto à SECULTFOR", "inicio": "2026-06-08", "nup": null, "responsavel": "Karol", "parceiros": "SECULTFOR", "prioridade": "Média", "prazo": null, "status": "Concluído", "proxima": "Enviar RRT", "obs": null}, {"id": "008", "frente": "Restauro e Patrimônio Histórico", "entrega": "Envio de RRTs À SECULTFOR", "inicio": "2026-03-12", "nup": "59000.000403/2026-49", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Crítica", "prazo": "2026-08-14", "status": "Aguardando terceiros", "proxima": "Disponibilização de arquiteto", "obs": null}, {"id": "009", "frente": "Restauro e Patrimônio Histórico", "entrega": "Documentação técnica final", "inicio": "2026-11-20", "nup": null, "responsavel": "Maninha", "parceiros": "EAOTPS", "prioridade": "Baixa", "prazo": "2026-11-26", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "010", "frente": "Restauro e Patrimônio Histórico", "entrega": "Recebimento definitivo dos serviços de restauro", "inicio": "2026-11-20", "nup": null, "responsavel": "Maninha", "parceiros": "EAOTPS", "prioridade": "Baixa", "prazo": "2026-11-26", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "011", "frente": "Equipamentos e Mobiliário", "entrega": "Plataforma elevatória c/ bateria", "inicio": "2024-07-08", "nup": "59000.000642/2025-18", "responsavel": "Thaís", "parceiros": null, "prioridade": "Crítica", "prazo": "2026-08-20", "status": "Em andamento", "proxima": "perguntar aos fornecedores se aquisição é com bateria", "obs": null}, {"id": "012", "frente": "Equipamentos e Mobiliário", "entrega": "Mobiliário EM GERAL", "inicio": "2024-07-08", "nup": "59000.000320/2025-79", "responsavel": "Thaís", "parceiros": null, "prioridade": "Alta", "prazo": "2026-08-20", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "013", "frente": "Equipamentos e Mobiliário", "entrega": "Aparelhos e utensílios domésticos", "inicio": "2024-07-08", "nup": "59000.000369/2025-21", "responsavel": "Thaís", "parceiros": null, "prioridade": "Média", "prazo": "2026-10-20", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "014", "frente": "Equipamentos e Mobiliário", "entrega": "Equipamentos de informática", "inicio": "2025-05-06", "nup": " 59000.000493/2025-97", "responsavel": "Thaís", "parceiros": null, "prioridade": "Baixa", "prazo": null, "status": "Sobrestado", "proxima": null, "obs": null}, {"id": "015", "frente": "Equipamentos e Mobiliário", "entrega": "Ar-condicionado", "inicio": "2025-03-27", "nup": "59000.000133/2026-76\n59000.000275/2026-33\n59000.000548/2026-40", "responsavel": "Thaís", "parceiros": null, "prioridade": "Crítica", "prazo": "2026-08-20", "status": "Em andamento", "proxima": "agendar uma reunião com a empresa detentora da Ata SEPLAG para verifiacr a flexibilização", "obs": "a infraestrutura atualmente instalada contempla tubulações dimensionadas para equipamentos de 18.000 e 24.000 BTUs, enquanto a previsão de aquisição considera equipamentos de 36.000 BTUs"}, {"id": "016", "frente": "Evento de Inauguração", "entrega": "Informar ao MTE sobre a previsão de inauguração", "inicio": "2025-02-14", "nup": "59000.000223/2025-86", "responsavel": "Karol", "parceiros": "MTE", "prioridade": "Baixa", "prazo": "2026-10-05", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "017", "frente": "Gestão Patrimonial", "entrega": "Contratação emergencial dos serviços de segurança patrimonial", "inicio": "2025-07-07", "nup": "59000.000766/2025-01\n59400.006331/2023-98", "responsavel": "Nayara", "parceiros": null, "prioridade": null, "prazo": "2025-10-02", "status": "Concluído", "proxima": null, "obs": null}, {"id": "018", "frente": "Gestão Patrimonial", "entrega": "Contratação permanente dos serviços de segurança patrimonial", "inicio": "2024-07-29", "nup": "59000.000523/2024-84", "responsavel": "Thaís", "parceiros": null, "prioridade": "Crítica", "prazo": "2026-09-29", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "019", "frente": "Comunicação Institucional", "entrega": "Visitação institucional", "inicio": "2026-07-13", "nup": null, "responsavel": "Ana Clara", "parceiros": null, "prioridade": "Baixa", "prazo": null, "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "020", "frente": "Comunicação Institucional", "entrega": "Identidade visual da unidade (fachadas e placas; sinalização dos ambientes)", "inicio": "2026-03-02", "nup": null, "responsavel": "Luan", "parceiros": "Casa Civil", "prioridade": "Alta", "prazo": "2026-11-13", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "021", "frente": "Comunicação Institucional", "entrega": "Cobertura de imprensa", "inicio": null, "nup": null, "responsavel": "Ana Clara", "parceiros": null, "prioridade": "Baixa", "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "022", "frente": "Comunicação Institucional", "entrega": "Comunicação interna", "inicio": null, "nup": null, "responsavel": "Ana Clara", "parceiros": null, "prioridade": null, "prazo": null, "status": "Não se aplica", "proxima": null, "obs": null}, {"id": "023", "frente": "Comunicação Institucional", "entrega": "Plano de comunicação da inauguração", "inicio": null, "nup": null, "responsavel": "Ana Clara", "parceiros": "Casa Civil", "prioridade": "Média", "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "024", "frente": "Comunicação Institucional", "entrega": "Produção de material de divulgação", "inicio": null, "nup": null, "responsavel": "Ana Clara", "parceiros": "Casa Civil", "prioridade": "Baixa", "prazo": null, "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "026", "frente": "Parcerias Institucionais", "entrega": "Apoio da SECULT - Aditivo IDM", "inicio": "2025-07-15", "nup": "59000.000811/2025-10", "responsavel": "Karol", "parceiros": "SECULT", "prioridade": null, "prazo": "2026-06-12", "status": "Concluído", "proxima": null, "obs": null}, {"id": "027", "frente": "Parcerias Institucionais", "entrega": "Implantação Restaurante SESC", "inicio": "2026-04-01", "nup": null, "responsavel": "Karol", "parceiros": "SESC/KG/SOP", "prioridade": "Média", "prazo": "2026-11-20", "status": "Em andamento", "proxima": "Reunião de intervenção no predio com SESC, SOP e KG (aconteceu 31/07). levantar o orçamento para as intervenções ", "obs": null}, {"id": "028", "frente": "Parcerias Institucionais", "entrega": "Superintendência Regional do Trabalho (SRT)", "inicio": "2026-07-30", "nup": null, "responsavel": "Vladyson", "parceiros": "SRT", "prioridade": "Baixa", "prazo": "2026-08-14", "status": "Aguardando terceiros", "proxima": "Fazer levantamento das ações e competencias da SRT; pedir anuência à SPU", "obs": null}, {"id": "029", "frente": "Parcerias Institucionais", "entrega": "SESA", "inicio": null, "nup": null, "responsavel": "Vladyson", "parceiros": "SESA", "prioridade": null, "prazo": null, "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "030", "frente": "Parcerias Institucionais", "entrega": "Formalização do Termo de Cooperação com o SESC", "inicio": null, "nup": null, "responsavel": "Augusto", "parceiros": "SESC", "prioridade": "Baixa", "prazo": null, "status": "Aguardando terceiros", "proxima": "Definição dos serviços de cada parceiro", "obs": null}, {"id": "031", "frente": "Implantação dos Serviços", "entrega": "Mudança da Unidade Centro (IDT)", "inicio": null, "nup": null, "responsavel": "Silvia", "parceiros": "IDT", "prioridade": "Baixa", "prazo": null, "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "032", "frente": "Implantação dos Serviços", "entrega": "Layout operacional", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "033", "frente": "Implantação dos Serviços", "entrega": "Jornada do Cliente", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "034", "frente": "Implantação dos Serviços", "entrega": "Fluxos de atendimento", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "035", "frente": "Implantação dos Serviços", "entrega": "Capacitação dos atendentes", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "036", "frente": "Implantação dos Serviços", "entrega": "Testes operacionais", "inicio": null, "nup": null, "responsavel": "Viliberto", "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "037", "frente": "Implantação dos Serviços", "entrega": "Plano de contingência da inauguração", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "038", "frente": "Infraestrutura", "entrega": "Adequações do auditório (acessibilidade)", "inicio": "2026-07-27", "nup": null, "responsavel": "KG/SOP", "parceiros": "KG/SOP\nASTA MOBILI MOVEIS LTDA (IDVALDO)", "prioridade": "Média", "prazo": "2026-08-27", "status": "Em andamento", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "039", "frente": "Infraestrutura", "entrega": "Projeto de sonorização", "inicio": "2026-07-27", "nup": null, "responsavel": "KG/SOP", "parceiros": "ASTA MOBILI MOVEIS LTDA (IDVALDO)", "prioridade": "Média", "prazo": "2026-08-27", "status": "Em andamento", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "040", "frente": "Infraestrutura", "entrega": "Projeto de iluminação", "inicio": "2026-07-27", "nup": null, "responsavel": "KG/SOP", "parceiros": "ASTA MOBILI MOVEIS LTDA (IDVALDO)", "prioridade": "Média", "prazo": "2026-08-27", "status": "Em andamento", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "041", "frente": "Infraestrutura", "entrega": "Isolamento acústico", "inicio": "2026-07-27", "nup": null, "responsavel": "KG/SOP", "parceiros": "ASTA MOBILI MOVEIS LTDA (IDVALDO)", "prioridade": "Média", "prazo": "2026-08-27", "status": "Em andamento", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "042", "frente": "Infraestrutura", "entrega": "Sistema de exaustão dos banheiros", "inicio": "2026-07-22", "nup": null, "responsavel": "KG/SOP", "parceiros": "KG", "prioridade": "Crítica", "prazo": "2026-08-31", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "043", "frente": "Infraestrutura", "entrega": "Construção da Casa do Lixo", "inicio": "2026-09-01", "nup": null, "responsavel": "KG/SOP", "parceiros": "SESC", "prioridade": "Média", "prazo": "2026-09-10", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "044", "frente": "Infraestrutura", "entrega": "Revisão geral das pendências de acabamento", "inicio": "2026-11-02", "nup": null, "responsavel": "KG/SOP", "parceiros": "KG", "prioridade": "Baixa", "prazo": "2026-11-26", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "045", "frente": "Infraestrutura", "entrega": "Limpeza técnica pós-obra", "inicio": "2026-11-16", "nup": null, "responsavel": "KG/SOP", "parceiros": "KG", "prioridade": "Baixa", "prazo": "2026-11-26", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "046", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Sistema de monitoramento por câmeras", "inicio": "2026-03-12", "nup": null, "responsavel": "Simone/Viliberto/Caio", "parceiros": "ETICE/Golden", "prioridade": "Baixa", "prazo": "2026-10-30", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "047", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Rede lógica", "inicio": "2026-03-12", "nup": null, "responsavel": "Simone", "parceiros": "ETICE/Golden/KG", "prioridade": "Média", "prazo": "2026-10-30", "status": "Aguardando terceiros", "proxima": null, "obs": null}, {"id": "048", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Internet", "inicio": "2026-03-12", "nup": null, "responsavel": "Simone/Viliberto", "parceiros": "ETICE/Golden", "prioridade": "Baixa", "prazo": "2026-10-30", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "049", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Wi-Fi institucional", "inicio": null, "nup": null, "responsavel": null, "parceiros": null, "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "050", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Telefonia", "inicio": null, "nup": null, "responsavel": null, "parceiros": null, "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "051", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Equipamentos do SINE", "inicio": null, "nup": null, "responsavel": null, "parceiros": "IDT", "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "052", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Impressoras", "inicio": null, "nup": null, "responsavel": null, "parceiros": null, "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "053", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Totens de atendimento", "inicio": null, "nup": null, "responsavel": null, "parceiros": null, "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "054", "frente": "Tecnologia e Infraestrutura Operacional", "entrega": "Controle de acesso", "inicio": null, "nup": null, "responsavel": null, "parceiros": null, "prioridade": null, "prazo": null, "status": null, "proxima": null, "obs": null}, {"id": "055", "frente": "Evento de Inauguração", "entrega": "Cerimonial", "inicio": "2026-08-03", "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Média", "prazo": "2026-11-23", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "056", "frente": "Evento de Inauguração", "entrega": "Coquetel (26/11)", "inicio": "2026-10-01", "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Baixa", "prazo": "2026-11-23", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "057", "frente": "Evento de Inauguração", "entrega": "Convites", "inicio": "2026-11-03", "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Baixa", "prazo": "2026-11-19", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "058", "frente": "Evento de Inauguração", "entrega": "Autoridades", "inicio": null, "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Baixa", "prazo": null, "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "059", "frente": "Evento de Inauguração", "entrega": "Programação", "inicio": "2026-08-03", "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Média", "prazo": "2026-11-23", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "060", "frente": "Evento de Inauguração", "entrega": "Testes gerais", "inicio": "2026-11-23", "nup": null, "responsavel": "Luan", "parceiros": null, "prioridade": "Baixa", "prazo": "2026-11-25", "status": "Não iniciado", "proxima": null, "obs": null}, {"id": "061", "frente": "Gestão Patrimonial", "entrega": "Autorizações para intervenções - FASE 2", "inicio": "2026-02-24", "nup": "59000.000287/2026-68", "responsavel": "Karol", "parceiros": "IPHAN", "prioridade": null, "prazo": "2026-02-27", "status": "Concluído", "proxima": null, "obs": null}, {"id": "062", "frente": "Gestão Patrimonial", "entrega": "Retirada dos arquivos do DNOCS", "inicio": "2025-11-24", "nup": "59000.001398/2025-19", "responsavel": "Caio/Karol", "parceiros": "DNOCS", "prioridade": "Crítica", "prazo": "2025-05-27", "status": "Concluído", "proxima": null, "obs": null}, {"id": "063", "frente": "Gestão Patrimonial", "entrega": "Formalização da cessão permanente do imóvel", "inicio": "2025-07-02", "nup": "59000.000716/2025-16\n19739.034066/2024-82", "responsavel": "Karol", "parceiros": "SPU", "prioridade": null, "prazo": "2025-07-08", "status": "Concluído", "proxima": null, "obs": null}, {"id": "064", "frente": "Gestão Patrimonial", "entrega": "Contrato de Seguro Incendio", "inicio": "2026-06-10", "nup": "59000.001098/2026-11", "responsavel": "Patrícia Oliveira", "parceiros": "SOP/Bombeiros", "prioridade": "Média", "prazo": "2026-09-30", "status": "Em andamento", "proxima": "A SOP está inserindo nos orçamentos a consultoria de aprovação de alvará dos bombeiros e extintores", "obs": null}, {"id": "065", "frente": "Gestão Patrimonial", "entrega": "Planilha de racionalidade de uso", "inicio": "2025-01-24", "nup": null, "responsavel": "Anibal", "parceiros": "SPU", "prioridade": "Baixa", "prazo": null, "status": "Concluído", "proxima": null, "obs": null}, {"id": "066", "frente": "Gestão Patrimonial", "entrega": "Solicitações de anuência p/ lanchonete SESC", "inicio": "2026-07-27", "nup": null, "responsavel": "Karol", "parceiros": "SPU", "prioridade": "Alta", "prazo": "2026-08-17", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "067", "frente": "Gestão Patrimonial", "entrega": "Autorizações para intervenções - FASE 1", "inicio": "2025-05-26", "nup": "59000.000580/2025-44", "responsavel": "Anibal", "parceiros": "IPHAN", "prioridade": null, "prazo": "2025-06-02", "status": "Concluído", "proxima": null, "obs": null}, {"id": "068", "frente": "Gestão Contratual e Financeira", "entrega": "CONTRATO 06/2026 e nota de empenho - AUDITORIO", "inicio": "2025-11-16", "nup": "59000.001342/2025-56", "responsavel": "Anibal", "parceiros": "SOP", "prioridade": "Crítica", "prazo": "2025-07-21", "status": "Concluído", "proxima": null, "obs": null}, {"id": "069", "frente": "Gestão Contratual e Financeira", "entrega": "CONTRATO 26/2025 e nota de empenho - PAV SUPERIOR", "inicio": "2025-11-16", "nup": "59000.001340/2025-67", "responsavel": "Anibal", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-06-16", "status": "Concluído", "proxima": null, "obs": null}, {"id": "070", "frente": "Gestão Contratual e Financeira", "entrega": "Emissão de Ordem de Serviço - PAV SUPERIOR", "inicio": "2026-03-26", "nup": "59000.000463/2026-61", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": "2026-04-06", "status": "Concluído", "proxima": null, "obs": null}, {"id": "071", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 1ª medição da KG Construções e Solicitar pagamento da medição - PAV SUPERIOR", "inicio": "2026-06-24", "nup": "59000.000993/2026-18", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Média", "prazo": "2026-08-24", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "072", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 2ª medição da KG Construções e Solicitar pagamento da medição - PAV SUPERIOR", "inicio": "2026-07-28", "nup": "59000.001153/2026-64", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Média", "prazo": "2026-09-28", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "073", "frente": "Gestão Contratual e Financeira", "entrega": "CONTRATO 25/2025 e nota de empenho - PAV TERREO", "inicio": "2025-11-16", "nup": "59000.001341/2025-10", "responsavel": "Anibal", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-06-16", "status": "Concluído", "proxima": null, "obs": null}, {"id": "074", "frente": "Gestão Contratual e Financeira", "entrega": "Emissão de Ordem de Serviço - PAV TERREO", "inicio": "2026-01-09", "nup": "59000.000044/2026-20", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-02-04", "status": "Concluído", "proxima": null, "obs": null}, {"id": "075", "frente": "Gestão Contratual e Financeira", "entrega": "Suplementação orçamentária", "inicio": "2026-03-30", "nup": "59000.000484/2026-87", "responsavel": "Cecilia/Karol", "parceiros": "COGERF", "prioridade": "Crítica", "prazo": "2026-05-05", "status": "Concluído", "proxima": null, "obs": null}, {"id": "076", "frente": "Infraestrutura", "entrega": "Subestação abrigada e alimentação de quadros", "inicio": "2026-03-17", "nup": null, "responsavel": "SOP", "parceiros": "SOP", "prioridade": "Crítica", "prazo": "2026-11-20", "status": "Aguardando terceiros", "proxima": null, "obs": null}, {"id": "077", "frente": "Infraestrutura", "entrega": "Notificação à SanMichel", "inicio": "2026-12-10", "nup": "59000.001547/2025-31", "responsavel": "Antônio Carlos", "parceiros": "KG/SOP", "prioridade": "Crítica", "prazo": "2026-01-20", "status": "Concluído", "proxima": null, "obs": null}, {"id": "078", "frente": "Infraestrutura", "entrega": "Mudança de titularidade da Conta de água e esgoto", "inicio": "2024-10-22", "nup": "59000.000798/2024-18", "responsavel": "Anibal", "parceiros": "CAGECE", "prioridade": null, "prazo": "2025-04-24", "status": "Concluído", "proxima": null, "obs": null}, {"id": "079", "frente": "Infraestrutura", "entrega": "Mudança de titularidade da Conta de energia", "inicio": "2024-10-22", "nup": "59000.000799/2024-62", "responsavel": "Anibal", "parceiros": "ENEL", "prioridade": null, "prazo": "2025-09-04", "status": "Concluído", "proxima": null, "obs": null}, {"id": "080", "frente": "Infraestrutura", "entrega": "Construção de banheiros no piso superior", "inicio": "2026-07-30", "nup": null, "responsavel": "KG", "parceiros": "SOP", "prioridade": "Crítica", "prazo": "2026-11-20", "status": "Aguardando terceiros", "proxima": "levantar o que ainda não está previsto nos orçamentos/contratos ", "obs": null}, {"id": "081", "frente": "Gestão Contratual e Financeira", "entrega": "Alteração do Decreto SOP", "inicio": "2025-07-15", "nup": "59000.000804/2025-18", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": null, "status": "Concluído", "proxima": null, "obs": null}, {"id": "082", "frente": "Gestão Contratual e Financeira", "entrega": "Análise e parecer do orçamento proposto - AUDITORIO", "inicio": "2025-07-16", "nup": "59000.000812/2025-64", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": "2025-09-26", "status": "Concluído", "proxima": null, "obs": null}, {"id": "083", "frente": "Gestão Contratual e Financeira", "entrega": "Análise e parecer do orçamento proposto - COBERTA", "inicio": "2025-07-16", "nup": "59000.000813/2025-17", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": "2025-09-26", "status": "Concluído", "proxima": null, "obs": null}, {"id": "084", "frente": "Gestão Contratual e Financeira", "entrega": "Análise e parecer do orçamento proposto - PAV SUPERIOR", "inicio": "2025-07-16", "nup": "59000.000814/2025-53", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": "2025-09-26", "status": "Concluído", "proxima": null, "obs": null}, {"id": "085", "frente": "Gestão Contratual e Financeira", "entrega": "Análise e parecer do orçamento proposto - PAV TERREO", "inicio": "2025-07-16", "nup": "59000.000815/2025-06", "responsavel": "Karol", "parceiros": "SOP", "prioridade": null, "prazo": "2025-09-26", "status": "Concluído", "proxima": null, "obs": null}, {"id": "086", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 1ª medição da KG Construções e Solicitar pagamento da medição - PAV TERREO", "inicio": "2026-02-24", "nup": "59000.000290/2026-81", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-02-27", "status": "Concluído", "proxima": null, "obs": null}, {"id": "087", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 2ª medição da KG Construções e Solicitar pagamento da medição - PAV TERREO", "inicio": "2026-04-22", "nup": "59000.000619/2026-12", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-07-01", "status": "Concluído", "proxima": null, "obs": null}, {"id": "088", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 3ª medição da KG Construções e Solicitar pagamento da medição - PAV TERREO", "inicio": "2026-05-13", "nup": "59000.000752/2026-61", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Crítica", "prazo": "2026-07-13", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "089", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 4ª medição da KG Construções e Solicitar pagamento da medição - PAV TERREO", "inicio": "2026-06-24", "nup": "59000.000991/2026-11", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Média", "prazo": "2026-08-24", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "090", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 5ª medição da KG Construções e Solicitar pagamento da medição - PAV TERREO", "inicio": "2026-07-21", "nup": "59000.001127/2026-36", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Baixa", "prazo": "2026-09-21", "status": "Em andamento", "proxima": null, "obs": null}, {"id": "091", "frente": "Gestão Contratual e Financeira", "entrega": "CONTRATO 12/2025 e nomeação fiscal - COBERTA", "inicio": "2025-11-16", "nup": "59000.001339/2025-32", "responsavel": "Anibal", "parceiros": "SOP", "prioridade": null, "prazo": "2026-01-06", "status": "Concluído", "proxima": null, "obs": null}, {"id": "092", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 1ª medição da KG Construções e Solicitar pagamento da medição - COBERTA", "inicio": "2026-01-26", "nup": "59000.000096/2026-04", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-02-27", "status": "Concluído", "proxima": null, "obs": null}, {"id": "093", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 2ª medição da KG Construções e Solicitar pagamento da medição - COBERTA", "inicio": "2026-02-24", "nup": "59000.000289/2026-57", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-04-23", "status": "Concluído", "proxima": null, "obs": null}, {"id": "094", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 3ª medição da KG Construções e Solicitar pagamento da medição - COBERTA", "inicio": "2026-03-17", "nup": "59000.000423/2026-10", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": null, "prazo": "2026-06-11", "status": "Concluído", "proxima": null, "obs": null}, {"id": "095", "frente": "Gestão Contratual e Financeira", "entrega": "Receber 4ª medição da KG Construções e Solicitar pagamento da medição - COBERTA", "inicio": "2026-05-11", "nup": "59000.000742/2026-25", "responsavel": "Karol", "parceiros": "KG/SOP", "prioridade": "Crítica", "prazo": "2026-07-11", "status": "Em andamento", "proxima": null, "obs": null}]
+
+</script>
+<script>
+const RAW = JSON.parse(document.getElementById('rawData').textContent);
+const DATA = RAW.filter(r => r.entrega); // descarta linhas em branco
+
+// Mapeia a "Frente Estratégica" da planilha para os blocos que você usa no dia a dia
+const FRENTE_ALIAS = {
+  "Infraestrutura": "REFORMA",
+  "Restauro e Patrimônio Histórico": "RESTAURO",
+  "Equipamentos e Mobiliário": "AQUISIÇÃO",
+  "Comunicação Institucional": "COMUNICAÇÃO",
+  "Evento de Inauguração": "INAUGURAÇÃO",
+  "Parcerias Institucionais": "PARCERIAS",
+  "Implantação dos Serviços": "MUDANÇA DE UNIDADE",
+  "Gestão Patrimonial": "GESTÃO PATRIMONIAL",
+  "Gestão Contratual e Financeira": "GESTÃO CONTRATUAL",
+  "Tecnologia e Infraestrutura Operacional": "TECNOLOGIA"
+};
+
+const STATUS_ORDER = ["Em andamento","Aguardando terceiros","Não iniciado","Concluído","Sobrestado","Não se aplica"];
+const PRIO_ORDER = {"Crítica":0,"Alta":1,"Média":2,"Baixa":3};
+
+function statusClass(s){
+  if(!s) return "st-none";
+  return "st-" + s.replace(/\s+/g,'_');
+}
+function prioClass(p){
+  return p ? "prio-"+p : "prio-none";
+}
+function fmtDate(d){
+  if(!d) return "—";
+  const dt = new Date(d+"T00:00:00");
+  if(isNaN(dt)) return d;
+  return dt.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+const TODAY = new Date("2026-08-04T00:00:00");
+function daysUntil(d){
+  if(!d) return null;
+  const dt = new Date(d+"T00:00:00");
+  if(isNaN(dt)) return null;
+  return Math.round((dt - TODAY) / 86400000);
+}
+function isOpen(status){
+  return status !== "Concluído" && status !== "Não se aplica";
+}
+
+// progresso "estimado" por status, para as barras dos blocos
+const STATUS_PROGRESS = {
+  "Concluído": 1,
+  "Em andamento": 0.55,
+  "Aguardando terceiros": 0.3,
+  "Não iniciado": 0,
+  "Sobrestado": 0.1,
+  "Não se aplica": null
+};
+
+// ---------------- KPIs ----------------
+function renderKPIs(rows){
+  const total = rows.length;
+  const done = rows.filter(r=>r.status==="Concluído").length;
+  const progress = rows.filter(r=>r.status==="Em andamento").length;
+  const waiting = rows.filter(r=>r.status==="Aguardando terceiros").length;
+  const notstarted = rows.filter(r=>r.status==="Não iniciado").length;
+  const critical = rows.filter(r=>r.prioridade==="Crítica" && isOpen(r.status)).length;
+
+  const kpis = [
+    {cls:"total", num: total, lbl:"Total de ações"},
+    {cls:"done", num: done, lbl:"Concluídas"},
+    {cls:"progress", num: progress, lbl:"Em andamento"},
+    {cls:"waiting", num: waiting, lbl:"Aguardando terceiros"},
+    {cls:"notstarted", num: notstarted, lbl:"Não iniciadas"},
+    {cls:"critical", num: critical, lbl:"Críticas em aberto"},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k=>`
+    <div class="kpi ${k.cls}">
+      <div class="num">${k.num}</div>
+      <div class="lbl">${k.lbl}</div>
+    </div>`).join('');
+
+  // ring
+  const pct = total ? Math.round(done/total*100) : 0;
+  const r = 32, circ = 2*Math.PI*r;
+  const ring = document.getElementById('ringProgress');
+  ring.setAttribute('stroke-dasharray', circ);
+  ring.setAttribute('stroke-dashoffset', circ - (circ*pct/100));
+  document.getElementById('ringPct').textContent = pct+"%";
+}
+
+// ---------------- BLOCOS ----------------
+let activeFrente = "";
+function renderBlocks(){
+  const frentes = {};
+  DATA.forEach(r=>{
+    if(!r.frente) return;
+    frentes[r.frente] = frentes[r.frente] || [];
+    frentes[r.frente].push(r);
+  });
+  document.getElementById('frenteTag').textContent = Object.keys(frentes).length + " blocos";
+
+  const order = Object.keys(FRENTE_ALIAS).filter(f=>frentes[f]);
+  Object.keys(frentes).forEach(f=>{ if(!order.includes(f)) order.push(f); });
+
+  document.getElementById('blocksRow').innerHTML = order.map(f=>{
+    const items = frentes[f];
+    const total = items.length;
+    const done = items.filter(r=>r.status==="Concluído").length;
+    const prog = items.filter(r=>r.status==="Em andamento").length;
+    const wait = items.filter(r=>r.status==="Aguardando terceiros").length;
+    const notst = total-done-prog-wait;
+    const pctDone = total ? done/total*100 : 0;
+    const pctProg = total ? prog/total*100 : 0;
+    const pctWait = total ? wait/total*100 : 0;
+    const pctRest = 100-pctDone-pctProg-pctWait;
+    const alias = FRENTE_ALIAS[f] || "";
+    return `<div class="block ${activeFrente===f?'active':''}" data-frente="${f.replace(/"/g,'&quot;')}">
+      <div class="block-top">
+        <div>
+          <div class="block-name">${f}</div>
+          ${alias ? `<div class="block-alt">${alias}</div>` : ''}
+        </div>
+        <div class="block-count">${total} ${total===1?'item':'itens'}</div>
+      </div>
+      <div class="block-bar">
+        <span style="width:${pctDone}%; background:var(--green);"></span>
+        <span style="width:${pctProg}%; background:var(--steel);"></span>
+        <span style="width:${pctWait}%; background:var(--amber);"></span>
+        <span style="width:${pctRest}%; background:var(--gray-bg);"></span>
+      </div>
+      <div class="block-foot"><span>Concluído</span><b>${done}/${total}</b></div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.block').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const f = el.getAttribute('data-frente');
+      activeFrente = (activeFrente === f) ? "" : f;
+      document.getElementById('fFrente').value = activeFrente;
+      renderBlocks();
+      applyFilters();
+    });
+  });
+}
+
+// ---------------- RADAR CRÍTICO ----------------
+function renderRadar(){
+  const items = DATA.filter(r => isOpen(r.status) && (r.prioridade==="Crítica" || r.prioridade==="Alta"));
+  items.sort((a,b)=>{
+    const pa = PRIO_ORDER[a.prioridade] ?? 9, pb = PRIO_ORDER[b.prioridade] ?? 9;
+    if(pa!==pb) return pa-pb;
+    const da = daysUntil(a.prazo), db = daysUntil(b.prazo);
+    if(da===null) return 1;
+    if(db===null) return -1;
+    return da-db;
+  });
+  const top = items.slice(0,8);
+  if(top.length===0){
+    document.getElementById('radarList').innerHTML = '<div class="radar-empty">Nenhuma ação crítica ou de alta prioridade em aberto no momento.</div>';
+    return;
+  }
+  document.getElementById('radarList').innerHTML = top.map(r=>{
+    const d = daysUntil(r.prazo);
+    let daysLabel = "sem prazo definido", daysCls = "";
+    if(d!==null){
+      if(d<0){ daysLabel = `${Math.abs(d)} dia(s) atrasado`; daysCls="late"; }
+      else if(d<=15){ daysLabel = `${d} dia(s) restantes`; daysCls="soon"; }
+      else { daysLabel = `${d} dia(s) restantes`; }
+    }
+    return `<div class="radar-item ${r.prioridade==='Crítica'?'':'warn'}">
+      <span class="radar-id">#${r.id}</span>
+      <span>
+        <span class="radar-name">${r.entrega}</span><br>
+        <span class="radar-frente">${FRENTE_ALIAS[r.frente]||r.frente}${r.parceiros ? ' · '+r.parceiros : ''}</span>
+      </span>
+      <span class="badge ${statusClass(r.status)}">${r.status||'—'}</span>
+      <span class="radar-resp">${r.responsavel||'—'}</span>
+      <span class="radar-days ${daysCls}">${daysLabel}</span>
+      ${r.proxima ? `<span class="radar-next">↳ ${r.proxima}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ---------------- FILTROS + TABELA ----------------
+function uniqueSorted(key){
+  return [...new Set(DATA.map(r=>r[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+function populateFilterOptions(){
+  const fFrente = document.getElementById('fFrente');
+  uniqueSorted('frente').forEach(v=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=v; fFrente.appendChild(o);
+  });
+  const fStatus = document.getElementById('fStatus');
+  STATUS_ORDER.filter(s=>DATA.some(r=>r.status===s)).forEach(v=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=v; fStatus.appendChild(o);
+  });
+  const fPrio = document.getElementById('fPrio');
+  Object.keys(PRIO_ORDER).filter(p=>DATA.some(r=>r.prioridade===p)).forEach(v=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=v; fPrio.appendChild(o);
+  });
+  const fResp = document.getElementById('fResp');
+  uniqueSorted('responsavel').forEach(v=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=v; fResp.appendChild(o);
+  });
+}
+
+let sortKey = "prazo", sortDir = 1;
+
+function applyFilters(){
+  const frente = document.getElementById('fFrente').value;
+  const status = document.getElementById('fStatus').value;
+  const prio = document.getElementById('fPrio').value;
+  const resp = document.getElementById('fResp').value;
+  const search = document.getElementById('fSearch').value.trim().toLowerCase();
+
+  let rows = DATA.filter(r=>{
+    if(frente && r.frente!==frente) return false;
+    if(status && r.status!==status) return false;
+    if(prio && r.prioridade!==prio) return false;
+    if(resp && r.responsavel!==resp) return false;
+    if(search){
+      const hay = [r.entrega,r.frente,r.responsavel,r.parceiros,r.proxima,r.obs,r.nup].filter(Boolean).join(' ').toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let va = a[sortKey], vb = b[sortKey];
+    if(sortKey==="prazo"){
+      va = va ? new Date(va) : new Date("2100-01-01");
+      vb = vb ? new Date(vb) : new Date("2100-01-01");
+    } else if(sortKey==="prioridade"){
+      va = PRIO_ORDER[va] ?? 9; vb = PRIO_ORDER[vb] ?? 9;
+    } else {
+      va = (va||"").toString().toLowerCase(); vb = (vb||"").toString().toLowerCase();
+    }
+    if(va<vb) return -1*sortDir;
+    if(va>vb) return 1*sortDir;
+    return 0;
+  });
+
+  renderKPIs(rows);
+  renderTable(rows);
+  document.getElementById('countShowing').textContent = `Mostrando ${rows.length} de ${DATA.length} ações`;
+  document.getElementById('tableTag').textContent = rows.length + " itens";
+}
+
+function renderTable(rows){
+  document.getElementById('tableBody').innerHTML = rows.map(r=>{
+    const d = daysUntil(r.prazo);
+    const late = d!==null && d<0 && isOpen(r.status);
+    return `<tr class="${late?'overdue':''}">
+      <td class="id">#${r.id}</td>
+      <td class="frente-cell">${FRENTE_ALIAS[r.frente]||r.frente||'—'}</td>
+      <td class="entrega">${r.entrega||'—'}</td>
+      <td class="resp">${r.responsavel||'—'}</td>
+      <td class="parc">${r.parceiros||'—'}</td>
+      <td><span class="prio ${prioClass(r.prioridade)}">${r.prioridade||'—'}</span></td>
+      <td class="prazo ${late?'late':''}">${fmtDate(r.prazo)}${late?' ⚠':''}</td>
+      <td><span class="badge ${statusClass(r.status)}">${r.status||'—'}</span></td>
+      <td class="next">${r.proxima||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('#mainTable thead th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.getAttribute('data-key');
+    if(sortKey===key){ sortDir*=-1; } else { sortKey=key; sortDir=1; }
+    document.querySelectorAll('#mainTable thead th').forEach(t=>t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    applyFilters();
+  });
+});
+
+['fFrente','fStatus','fPrio','fResp'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', ()=>{
+    if(id==='fFrente'){ activeFrente = document.getElementById('fFrente').value; renderBlocks(); }
+    applyFilters();
+  });
+});
+document.getElementById('fSearch').addEventListener('input', applyFilters);
+document.getElementById('clearFilters').addEventListener('click', ()=>{
+  document.getElementById('fFrente').value="";
+  document.getElementById('fStatus').value="";
+  document.getElementById('fPrio').value="";
+  document.getElementById('fResp').value="";
+  document.getElementById('fSearch').value="";
+  activeFrente = "";
+  renderBlocks();
+  applyFilters();
+});
+
+// init
+populateFilterOptions();
+renderBlocks();
+renderRadar();
+applyFilters();
+</script>
+</body>
+</html>

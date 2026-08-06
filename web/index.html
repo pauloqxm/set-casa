@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Casa do Trabalhador · Painel de Monitoramento</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Acompanhamento gerencial</p>
+              <h1>Casa do Trabalhador · Painel de Monitoramento</h1>
+              <p class="topbar-meta">
+                Atualizado: <span id="atualizadoEm">—</span>
+              </p>
+            </div>
+          </div>
+          <div class="top-progress">
+            <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+              <circle
+                cx="42"
+                cy="42"
+                r="34"
+                fill="none"
+                stroke="#e4e4e4"
+                stroke-width="8"
+              />
+              <circle
+                id="ringProgress"
+                cx="42"
+                cy="42"
+                r="34"
+                fill="none"
+                stroke="#39b54a"
+                stroke-width="8"
+                stroke-linecap="round"
+                transform="rotate(-90 42 42)"
+              />
+              <text
+                x="42"
+                y="40"
+                text-anchor="middle"
+                class="ring-num"
+                id="ringPct"
+              >
+                0%
+              </text>
+              <text
+                x="42"
+                y="54"
+                text-anchor="middle"
+                class="ring-label"
+              >
+                CONCLUÍDO
+              </text>
+            </svg>
+            <div class="inaug-meta">
+              <span class="eyebrow">Inauguração</span>
+              <strong>26/11/2026</strong>
+              <span id="diasInaug">—</span>
+            </div>
+          </div>
+          <div class="user-nav" id="userNav">
+            <span class="user-chip" id="userChip" hidden>—</span>
+            <a class="btn-ghost btn-small" id="linkAdmin" href="/admin.html" hidden>
+              Usuários
+            </a>
+            <button type="button" class="btn-ghost btn-small" id="btnSair">
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="wrap">
+        <section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+        <section class="panel" aria-labelledby="frentesTitle">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2 id="frentesTitle">Frentes de trabalho</h2>
+              <p>Composição do progresso por status em cada frente</p>
+            </div>
+            <span class="tag" id="frenteTag">—</span>
+          </div>
+          <div class="blocks" id="blocksRow"></div>
+          <div class="legend">
+            <span><i class="lg-green"></i> Concluído</span>
+            <span><i class="lg-blue"></i> Em andamento</span>
+            <span><i class="lg-orange"></i> Aguardando terceiros</span>
+            <span><i class="lg-gray"></i> Demais</span>
+          </div>
+        </section>
+
+        <section class="attention panel" aria-labelledby="atencaoTitle">
+          <div class="panel-head">
+            <h2 id="atencaoTitle">Atenção do gerente</h2>
+            <p>Críticas, atrasadas e aguardando terceiros · com prazo em dias</p>
+          </div>
+          <div class="attention-tabs" id="atencaoTabs" role="tablist" aria-label="Estágios de atenção"></div>
+          <div class="attention-list" id="atencaoList"></div>
+        </section>
+
+        <section class="controls panel">
+          <div class="tabs" id="tabs" role="tablist" aria-label="Blocos"></div>
+          <div class="filters">
+            <label>
+              Status
+              <select id="filterStatus"></select>
+            </label>
+            <label>
+              Prioridade
+              <select id="filterPrioridade"></select>
+            </label>
+            <label>
+              Responsável
+              <select id="filterResponsavel"></select>
+            </label>
+            <label class="filter-search">
+              Busca
+              <input
+                id="filterSearch"
+                type="search"
+                placeholder="Entrega, NUP, providência…"
+              />
+            </label>
+          </div>
+          <div class="view-row">
+            <p class="result-count" id="resultCount"></p>
+            <div class="view-actions">
+              <button type="button" class="btn-run btn-small" id="btnNovaAcao">
+                Nova ação
+              </button>
+              <div class="view-toggle" role="group" aria-label="Modo de visualização">
+                <button type="button" class="view-btn is-active" data-view="cards">
+                  Cards
+                </button>
+                <button type="button" class="view-btn" data-view="table">
+                  Tabela
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cards" id="cards" aria-live="polite"></section>
+
+        <section class="table-panel panel is-hidden" id="tablePanel">
+          <div class="table-scroll">
+            <table id="mainTable">
+              <thead>
+                <tr>
+                  <th data-key="id">ID</th>
+                  <th data-key="frente">Frente</th>
+                  <th data-key="entrega">Entrega / Ação</th>
+                  <th data-key="responsavel">Responsável</th>
+                  <th data-key="parceiros">Parceiros</th>
+                  <th data-key="prioridade">Prioridade</th>
+                  <th data-key="data_mudanca">Data mudança</th>
+                  <th data-key="prazo">Prazo</th>
+                  <th data-key="status">Status</th>
+                  <th data-key="proxima">Próxima providência</th>
+                  <th>Foto</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-strip" aria-hidden="true">
+          <span class="strip-green"></span>
+          <span class="strip-blue"></span>
+          <span class="strip-orange"></span>
+        </div>
+        <p>Casa do Trabalhador — monitoramento de entregas e providências</p>
+      </footer>
+    </div>
+
+    <dialog id="editDialog" class="dialog">
+      <form method="dialog" id="editForm">
+        <header>
+          <p class="eyebrow" id="editEyebrow">Editar ação</p>
+          <h3 id="editTitle">—</h3>
+        </header>
+        <input type="hidden" id="editId" />
+        <input type="hidden" id="editMode" value="edit" />
+
+        <label>
+          Entrega / Ação
+          <input id="editEntrega" type="text" required />
+        </label>
+        <label>
+          Frente estratégica
+          <select id="editFrente"></select>
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Responsável
+            <input id="editResponsavel" type="text" />
+          </label>
+          <label>
+            Parceiros
+            <input id="editParceiros" type="text" />
+          </label>
+        </div>
+        <label>
+          NUP
+          <input id="editNup" type="text" />
+        </label>
+
+        <label>
+          Status
+          <select id="editStatus"></select>
+        </label>
+        <label>
+          Prioridade
+          <select id="editPrioridade">
+            <option value="">—</option>
+            <option>Crítica</option>
+            <option>Alta</option>
+            <option>Média</option>
+            <option>Baixa</option>
+          </select>
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Data da mudança
+            <input id="editDataMudanca" type="date" />
+          </label>
+          <label>
+            Prazo
+            <input id="editPrazo" type="date" />
+          </label>
+        </div>
+        <label>
+          %
+          <input id="editPct" type="number" min="0" max="100" step="1" />
+        </label>
+        <label>
+          Próxima providência
+          <textarea id="editProxima" rows="3"></textarea>
+        </label>
+        <label>
+          Observações
+          <textarea id="editObs" rows="3"></textarea>
+        </label>
+        <div class="foto-field">
+          <span class="foto-label">Foto da movimentação</span>
+          <p class="foto-hint" id="fotoHint">
+            Opcional · JPG, PNG, WEBP ou GIF · até 5 MB
+          </p>
+          <input
+            id="editFoto"
+            class="foto-input-native"
+            type="file"
+            accept="image/*"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <button type="button" class="btn-run btn-small" id="btnTirarFoto">
+            Tirar foto
+          </button>
+          <div class="foto-preview-wrap" id="fotoPreviewWrap" hidden>
+            <img id="fotoPreview" class="foto-preview" alt="Pré-visualização da foto" />
+            <label class="foto-remove-label">
+              <input id="editRemoverFoto" type="checkbox" />
+              Remover foto atual
+            </label>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn-danger" id="editDelete">
+            Limpar providência
+          </button>
+          <div class="dialog-actions-right">
+            <button type="button" class="btn-ghost" id="editCancel">Cancelar</button>
+            <button type="submit" class="btn-run" id="editSubmit">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

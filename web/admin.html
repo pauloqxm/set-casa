@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administração · Casa do Trabalhador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Administração</p>
+              <h1>Usuários e senhas</h1>
+              <p class="topbar-meta">
+                Gerencie o acesso ao painel de monitoramento
+              </p>
+            </div>
+          </div>
+          <div class="user-nav" id="userNav">
+            <a class="btn-ghost btn-small" href="/">Voltar ao painel</a>
+            <button type="button" class="btn-ghost btn-small" id="btnSair">
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="wrap admin-wrap">
+        <section class="panel admin-panel">
+          <div class="panel-head">
+            <h2>Novo usuário</h2>
+            <p>Crie contas com usuário, senha e nível (Administrador, Editor ou Consulta)</p>
+          </div>
+          <form id="userForm" class="admin-form">
+            <div class="admin-form-grid">
+              <label>
+                Usuário
+                <input id="userLogin" type="text" required minlength="3" autocomplete="off" />
+              </label>
+              <label>
+                Nome
+                <input id="userNome" type="text" autocomplete="off" />
+              </label>
+              <label>
+                Senha
+                <input id="userSenha" type="password" required minlength="6" autocomplete="new-password" />
+              </label>
+              <label>
+                Papel
+                <select id="userPapel">
+                  <option value="editor">Editor</option>
+                  <option value="consulta">Consulta</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </label>
+            </div>
+            <p class="login-error" id="formError" hidden></p>
+            <div class="dialog-actions-right admin-form-actions">
+              <button type="submit" class="btn-run">Incluir usuário</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Usuários cadastrados</h2>
+              <p>Senhas são armazenadas com hash (PBKDF2) — nunca em texto puro</p>
+            </div>
+            <span class="tag" id="userCount">—</span>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Nome</th>
+                  <th>Papel</th>
+                  <th>Status</th>
+                  <th>Criado em</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="editUserDialog" class="dialog">
+      <form method="dialog" id="editUserForm">
+        <header>
+          <p class="eyebrow">Editar usuário</p>
+          <h3 id="editUserTitle">—</h3>
+        </header>
+        <input type="hidden" id="editUserId" />
+        <label>
+          Nome
+          <input id="editUserNome" type="text" />
+        </label>
+        <label>
+          Papel
+          <select id="editUserPapel">
+            <option value="editor">Editor</option>
+            <option value="consulta">Consulta</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select id="editUserAtivo">
+            <option value="1">Ativo</option>
+            <option value="0">Inativo</option>
+          </select>
+        </label>
+        <label>
+          Nova senha
+          <input
+            id="editUserSenha"
+            type="password"
+            minlength="6"
+            placeholder="Deixe em branco para manter"
+            autocomplete="new-password"
+          />
+        </label>
+        <p class="login-error" id="editUserError" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-danger" id="editUserDelete">
+            Excluir
+          </button>
+          <div class="dialog-actions-right">
+            <button type="button" class="btn-ghost" id="editUserCancel">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-run">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/js/admin.js"></script>
+  </body>
+</html>

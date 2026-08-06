@@ -1,0 +1,704 @@
+#!/usr/bin/env python3
+"""Servidor do painel Casa do Trabalhador (local ou Railway + Supabase)."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from datetime import date, datetime
+from http.cookies import SimpleCookie
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+import db
+
+ROOT = Path(__file__).resolve().parent
+WEB = ROOT / "web"
+HOST = os.environ.get("HOST", "0.0.0.0" if db.USE_POSTGRES else "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8765"))
+SESSION_COOKIE = "ct_session"
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1" if db.USE_POSTGRES else "0").strip() in {
+    "1",
+    "true",
+    "True",
+    "yes",
+}
+
+DONE = {"concluído", "concluido"}
+NA = {"não se aplica", "nao se aplica"}
+INAUGURACAO = date(2026, 11, 26)
+
+PUBLIC_PREFIXES = ("/static/",)
+PUBLIC_PATHS = {
+    "/login.html",
+    "/api/login",
+    "/api/logout",
+    "/api/me",
+    "/api/health",
+    "/favicon.ico",
+}
+
+
+def parse_date(value: str) -> date | None:
+    if not value:
+        return None
+    value = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def is_done(status: str) -> bool:
+    return (status or "").strip().casefold() in DONE
+
+
+def is_na(status: str) -> bool:
+    return (status or "").strip().casefold() in NA
+
+
+def is_atrasado(item: dict, today: date) -> bool:
+    if is_done(item.get("status", "")) or is_na(item.get("status", "")):
+        return False
+    prazo = parse_date(item.get("prazo", ""))
+    return bool(prazo and prazo < today)
+
+
+def days_until(prazo_value: str, today: date) -> int | None:
+    prazo = parse_date(prazo_value)
+    if not prazo:
+        return None
+    return (prazo - today).days
+
+
+def pct_number(value) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(str(value).replace("%", "").replace(",", ".").strip())
+    except ValueError:
+        return None
+
+
+def compute_kpis(itens: list[dict]) -> dict:
+    today = date.today()
+    total = len(itens)
+    concluidos = sum(1 for i in itens if is_done(i.get("status", "")))
+    na = sum(1 for i in itens if is_na(i.get("status", "")))
+    denominador = max(total - na, 1)
+    pcts = [p for i in itens if (p := pct_number(i.get("pct"))) is not None]
+    if pcts:
+        progresso = round(sum(pcts) / len(pcts), 1)
+    else:
+        progresso = round(100.0 * concluidos / denominador, 1)
+
+    criticas = sum(
+        1
+        for i in itens
+        if (i.get("prioridade") or "").casefold() == "crítica"
+        and not is_done(i.get("status", ""))
+        and not is_na(i.get("status", ""))
+    )
+    atrasadas = sum(1 for i in itens if is_atrasado(i, today))
+    aguardando = sum(
+        1
+        for i in itens
+        if (i.get("status") or "").casefold() == "aguardando terceiros"
+    )
+    em_andamento = sum(
+        1 for i in itens if (i.get("status") or "").casefold() == "em andamento"
+    )
+    nao_iniciados = sum(
+        1 for i in itens if (i.get("status") or "").casefold() == "não iniciado"
+    )
+    return {
+        "total": total,
+        "concluidos": concluidos,
+        "progresso_pct": progresso,
+        "criticas_abertas": criticas,
+        "atrasadas": atrasadas,
+        "aguardando_terceiros": aguardando,
+        "em_andamento": em_andamento,
+        "nao_iniciados": nao_iniciados,
+        "hoje": today.isoformat(),
+        "inauguracao": INAUGURACAO.isoformat(),
+        "dias_para_inauguracao": (INAUGURACAO - today).days,
+    }
+
+
+def compute_frentes(itens: list[dict]) -> list[dict]:
+    groups: dict[str, list[dict]] = {}
+    for item in itens:
+        frente = (item.get("frente") or "").strip() or "Sem frente"
+        groups.setdefault(frente, []).append(item)
+
+    order_preferida = [
+        "Infraestrutura",
+        "Restauro e Patrimônio Histórico",
+        "Equipamentos e Mobiliário",
+        "Comunicação Institucional",
+        "Evento de Inauguração",
+        "Parcerias Institucionais",
+        "Implantação dos Serviços",
+        "Gestão Patrimonial",
+        "Gestão Contratual e Financeira",
+        "Tecnologia e Infraestrutura Operacional",
+    ]
+    ordered = [f for f in order_preferida if f in groups]
+    ordered.extend(sorted(f for f in groups if f not in ordered))
+
+    out = []
+    for frente in ordered:
+        rows = groups[frente]
+        total = len(rows)
+        done = sum(1 for i in rows if is_done(i.get("status", "")))
+        andamento = sum(
+            1 for i in rows if (i.get("status") or "").casefold() == "em andamento"
+        )
+        aguardando = sum(
+            1
+            for i in rows
+            if (i.get("status") or "").casefold() == "aguardando terceiros"
+        )
+        rest = max(total - done - andamento - aguardando, 0)
+        sample = rows[0]
+        out.append(
+            {
+                "frente": frente,
+                "bloco": sample.get("bloco", "outras"),
+                "bloco_label": sample.get("bloco_label", "Outras"),
+                "total": total,
+                "concluidos": done,
+                "em_andamento": andamento,
+                "aguardando_terceiros": aguardando,
+                "outros": rest,
+                "pct_concluidos": round(100.0 * done / total, 1) if total else 0,
+                "pct_andamento": round(100.0 * andamento / total, 1) if total else 0,
+                "pct_aguardando": round(100.0 * aguardando / total, 1) if total else 0,
+                "pct_outros": round(100.0 * rest / total, 1) if total else 0,
+            }
+        )
+    return out
+
+
+def annotate_items(itens: list[dict]) -> list[dict]:
+    today = date.today()
+    out = []
+    for item in itens:
+        clone = dict(item)
+        clone["atrasado"] = is_atrasado(item, today)
+        clone["dias_prazo"] = days_until(item.get("prazo", ""), today)
+        foto = item.get("foto") or ""
+        clone["foto_url"] = db.foto_public_url(foto) if foto else ""
+        out.append(clone)
+    return out
+
+
+def attention_items(itens: list[dict]) -> list[dict]:
+    today = date.today()
+    selected = []
+    for item in itens:
+        status = (item.get("status") or "").casefold()
+        prio = (item.get("prioridade") or "").casefold()
+        if is_done(status) or is_na(status):
+            continue
+        if prio == "crítica" or is_atrasado(item, today) or status == "aguardando terceiros":
+            selected.append(item)
+
+    def sort_key(item: dict):
+        prio = (item.get("prioridade") or "").casefold()
+        prio_rank = 0 if prio == "crítica" else 1 if prio == "alta" else 2
+        dias = item.get("dias_prazo")
+        dias_rank = dias if dias is not None else 10_000
+        return (prio_rank, dias_rank, item.get("id") or "")
+
+    selected.sort(key=sort_key)
+    return selected[:20]
+
+
+def painel_response() -> dict:
+    painel = db.load_painel()
+    raw_itens = painel.get("itens", [])
+    itens = annotate_items(raw_itens)
+    return {
+        **painel,
+        "itens": itens,
+        "kpis": compute_kpis(raw_itens),
+        "frentes": compute_frentes(raw_itens),
+        "atencao": attention_items(itens),
+        "banco": db.banco_label(),
+    }
+
+
+def is_public_path(path: str) -> bool:
+    if path in PUBLIC_PATHS:
+        return True
+    return any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES)
+
+
+def prepare_item_payload(body: dict, item_id: str, current_foto: str = "") -> dict:
+    """Remove campos de upload e aplica foto_base64/remover_foto."""
+    payload = dict(body or {})
+    # Impede gravar caminho arbitrário enviado pelo cliente
+    payload.pop("foto", None)
+    novo = db.apply_foto_from_payload(item_id, payload, current_foto=current_foto)
+    payload.pop("foto_base64", None)
+    payload.pop("foto_nome", None)
+    payload.pop("remover_foto", None)
+    if novo is not None:
+        payload["foto"] = novo
+    return payload
+
+
+class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(WEB), **kwargs)
+
+    def log_message(self, fmt: str, *args) -> None:
+        print(f"[{self.log_date_time_string()}] {fmt % args}")
+
+    def _send_json(self, payload: dict, status: int = 200, cookies: list[str] | None = None) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for cookie in cookies or []:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        if not raw:
+            return {}
+        return json.loads(raw.decode("utf-8"))
+
+    def _cookies(self) -> dict[str, str]:
+        jar = SimpleCookie()
+        raw = self.headers.get("Cookie", "")
+        if raw:
+            jar.load(raw)
+        return {k: morsel.value for k, morsel in jar.items()}
+
+    def _session_token(self) -> str | None:
+        return self._cookies().get(SESSION_COOKIE)
+
+    def _current_user(self) -> dict | None:
+        return db.get_session_user(self._session_token())
+
+    def _session_cookie(self, token: str, *, clear: bool = False) -> str:
+        secure = "; Secure" if COOKIE_SECURE else ""
+        if clear:
+            return (
+                f"{SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure}"
+            )
+        max_age = db.SESSION_DAYS * 24 * 60 * 60
+        return (
+            f"{SESSION_COOKIE}={token}; Path=/; Max-Age={max_age}; "
+            f"HttpOnly; SameSite=Lax{secure}"
+        )
+
+    def _require_user(self) -> dict | None:
+        user = self._current_user()
+        if user:
+            return user
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/"):
+            self._send_json({"ok": False, "erro": "Não autenticado"}, 401)
+        else:
+            self.send_response(302)
+            self.send_header("Location", "/login.html")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+        return None
+
+    def _require_admin(self) -> dict | None:
+        user = self._require_user()
+        if not user:
+            return None
+        if user.get("papel") != "admin":
+            if urlparse(self.path).path.startswith("/api/"):
+                self._send_json({"ok": False, "erro": "Acesso restrito a administradores"}, 403)
+            else:
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+            return None
+        return user
+
+    def _require_editor(self) -> dict | None:
+        user = self._require_user()
+        if not user:
+            return None
+        if not db.pode_editar(user.get("papel", "")):
+            self._send_json(
+                {"ok": False, "erro": "Perfil Consulta: apenas visualização"},
+                403,
+            )
+            return None
+        return user
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        path = parsed.path
+        # Normaliza path (alguns clientes enviam //api/...)
+        if path.startswith("//"):
+            path = "/" + path.lstrip("/")
+
+        if path in ("/api/health", "/health"):
+            import storage as _storage
+
+            self._send_json(
+                {
+                    "ok": True,
+                    "banco": db.banco_label(),
+                    "postgres": db.USE_POSTGRES,
+                    "storage": "supabase" if _storage.use_supabase_storage() else "local",
+                    "version": "railway-supabase-1",
+                    "path": path,
+                }
+            )
+            return
+
+        if path == "/api/logout":
+            db.destroy_session(self._session_token())
+            self._send_json(
+                {"ok": True},
+                cookies=[self._session_cookie("", clear=True)],
+            )
+            return
+
+        if not is_public_path(path):
+            if path.startswith("/admin") or path == "/admin.html":
+                user = self._require_admin()
+            else:
+                user = self._require_user()
+            if not user:
+                return
+
+        if path == "/api/painel":
+            self._send_json(painel_response())
+            return
+
+        foto_match = re.fullmatch(r"/api/fotos/(.+)", path)
+        if foto_match:
+            filename = unquote(foto_match.group(1))
+            payload = db.read_foto_bytes(filename)
+            if not payload:
+                self.send_error(404, "Foto não encontrada")
+                return
+            data, ctype = payload
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        if path == "/api/me":
+            user = self._current_user()
+            self._send_json({"ok": True, "usuario": user})
+            return
+
+        if path == "/api/usuarios":
+            if not self._require_admin():
+                return
+            self._send_json({"ok": True, "usuarios": db.list_usuarios()})
+            return
+
+        hist_match = re.fullmatch(r"/api/itens/([^/]+)/historico", path)
+        if hist_match:
+            item_id = hist_match.group(1)
+            with db.connect() as conn:
+                db.init_db(conn)
+                item = db.get_item(conn, item_id)
+            if not item:
+                self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "item_id": item_id,
+                    "entrega": item.get("entrega", ""),
+                    "historico": db.list_historico(item_id),
+                }
+            )
+            return
+
+        if path in ("/", "/index.html"):
+            self.path = "/index.html"
+        elif path in ("/admin", "/admin.html"):
+            self.path = "/admin.html"
+        elif path == "/login.html" and self._current_user():
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        return super().do_GET()
+
+    def do_PATCH(self) -> None:
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        user_match = re.fullmatch(r"/api/usuarios/(\d+)", path)
+        if user_match:
+            if not self._require_admin():
+                return
+            user_id = int(user_match.group(1))
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                updated = db.update_usuario(user_id, body)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            if not updated:
+                self._send_json({"ok": False, "erro": "Usuário não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "usuario": updated})
+            return
+
+        if not self._require_editor():
+            return
+
+        match = re.fullmatch(r"/api/itens/([^/]+)", path)
+        if not match:
+            self._send_json({"ok": False, "erro": "Rota não encontrada"}, 404)
+            return
+        item_id = match.group(1)
+        try:
+            body = self._read_json()
+        except json.JSONDecodeError:
+            self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+            return
+
+        with db.connect() as conn:
+            db.init_db(conn)
+            current = db.get_item(conn, item_id)
+        if not current:
+            self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+            return
+
+        try:
+            body = prepare_item_payload(body, item_id, current.get("foto", ""))
+        except ValueError as exc:
+            self._send_json({"ok": False, "erro": str(exc)}, 400)
+            return
+
+        found = db.update_item_fields(item_id, body)
+        if not found:
+            self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+            return
+
+        painel = db.load_painel()
+        found = annotate_items([found])[0]
+        self._send_json(
+            {
+                "ok": True,
+                "item": found,
+                "kpis": compute_kpis(painel.get("itens", [])),
+                "frentes": compute_frentes(painel.get("itens", [])),
+                "atualizado_em": painel.get("atualizado_em"),
+                "banco": db.banco_label(),
+            }
+        )
+
+    def do_DELETE(self) -> None:
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        user_match = re.fullmatch(r"/api/usuarios/(\d+)", path)
+        if user_match:
+            admin = self._require_admin()
+            if not admin:
+                return
+            user_id = int(user_match.group(1))
+            if user_id == admin.get("id"):
+                self._send_json(
+                    {"ok": False, "erro": "Não é possível excluir o próprio usuário"},
+                    400,
+                )
+                return
+            try:
+                if not db.delete_usuario(user_id):
+                    self._send_json({"ok": False, "erro": "Usuário não encontrado"}, 404)
+                    return
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "removido": user_id})
+            return
+
+        if not self._require_editor():
+            return
+
+        hist_match = re.fullmatch(
+            r"/api/itens/([^/]+)/historico/(\d+)", path
+        )
+        if hist_match:
+            item_id = hist_match.group(1)
+            hist_id = int(hist_match.group(2))
+            if not db.delete_historico(item_id, hist_id):
+                self._send_json({"ok": False, "erro": "Evento não encontrado"}, 404)
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "item_id": item_id,
+                    "historico": db.list_historico(item_id),
+                    "atualizado_em": db.load_painel().get("atualizado_em"),
+                }
+            )
+            return
+
+        match = re.fullmatch(r"/api/itens/([^/]+)", path)
+        if not match:
+            self._send_json({"ok": False, "erro": "Rota não encontrada"}, 404)
+            return
+        item_id = match.group(1)
+        if not db.delete_item(item_id):
+            self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+            return
+        painel = db.load_painel()
+        self._send_json(
+            {
+                "ok": True,
+                "removido": item_id,
+                "kpis": compute_kpis(painel.get("itens", [])),
+                "frentes": compute_frentes(painel.get("itens", [])),
+                "atualizado_em": painel.get("atualizado_em"),
+            }
+        )
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/login":
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            user = db.authenticate(body.get("usuario", ""), body.get("senha", ""))
+            if not user:
+                self._send_json(
+                    {"ok": False, "erro": "Usuário ou senha inválidos"},
+                    401,
+                )
+                return
+            token = db.create_session(user["id"])
+            self._send_json(
+                {"ok": True, "usuario": user},
+                cookies=[self._session_cookie(token)],
+            )
+            return
+
+        if path == "/api/logout":
+            db.destroy_session(self._session_token())
+            self._send_json(
+                {"ok": True},
+                cookies=[self._session_cookie("", clear=True)],
+            )
+            return
+
+        if path == "/api/usuarios":
+            if not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_usuario(
+                    body.get("usuario", ""),
+                    body.get("senha", ""),
+                    nome=body.get("nome", ""),
+                    papel=body.get("papel", "editor"),
+                )
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "usuario": created}, status=201)
+            return
+
+        if not self._require_editor():
+            return
+
+        if path == "/api/itens":
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                with db.connect() as conn:
+                    db.init_db(conn)
+                    item_id = db.next_item_id(conn)
+                body = prepare_item_payload(body, item_id, "")
+                body["id"] = item_id
+                created = db.create_item(body)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            painel = db.load_painel()
+            created = annotate_items([created])[0]
+            self._send_json(
+                {
+                    "ok": True,
+                    "item": created,
+                    "kpis": compute_kpis(painel.get("itens", [])),
+                    "frentes": compute_frentes(painel.get("itens", [])),
+                    "atualizado_em": painel.get("atualizado_em"),
+                },
+                status=201,
+            )
+            return
+
+        if path != "/api/reimportar":
+            self._send_json({"ok": False, "erro": "Rota não encontrada"}, 404)
+            return
+        from import_xlsx import run
+
+        run(preserve_edits=True)
+        self._send_json({"ok": True, **painel_response()})
+
+
+def main() -> None:
+    if not db.USE_POSTGRES:
+        print(
+            "AVISO: DATABASE_URL não definida — usando SQLite local. "
+            "No Railway, configure DATABASE_URL (Postgres do Supabase)."
+        )
+    db.ensure_db()
+    with db.connect() as conn:
+        db.init_db(conn)
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    print("Painel Casa do Trabalhador")
+    print(f"Banco: {db.banco_label()}")
+    print(f"Host: http://{HOST}:{PORT}/login.html")
+    print("Build: railway-supabase-1")
+    print("Ctrl+C para encerrar")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServidor encerrado.")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

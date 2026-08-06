@@ -1,0 +1,295 @@
+/* Login e administração — Casa do Trabalhador */
+
+.auth-body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(57, 181, 74, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(0, 113, 188, 0.08), transparent 50%),
+    var(--bg);
+}
+
+.login-card {
+  width: min(420px, 100%);
+  background: var(--white);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(77, 77, 77, 0.12);
+  padding: 28px 28px 32px;
+  border: 1px solid rgba(209, 211, 212, 0.7);
+}
+
+.login-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.login-logos .logo-set {
+  height: 64px;
+  width: auto;
+}
+
+.login-logos .logo-idt {
+  height: 48px;
+  width: auto;
+}
+
+.login-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 20px 0 22px;
+}
+
+.login-card h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1a4863;
+  letter-spacing: -0.01em;
+}
+
+.login-sub {
+  margin: 8px 0 22px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.login-card label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a4863;
+}
+
+.login-card input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--white);
+  box-sizing: border-box;
+}
+
+.login-card input:focus {
+  outline: 2px solid rgba(0, 113, 188, 0.35);
+  border-color: var(--blue);
+}
+
+.password-wrap {
+  position: relative;
+  display: block;
+}
+
+.password-wrap input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.password-toggle:hover {
+  color: #1a4863;
+  background: #f2f2f2;
+}
+
+.btn-login {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: #1a4863;
+  color: var(--white);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s, opacity 0.15s;
+}
+
+.btn-login:hover:not(:disabled) {
+  background: #143851;
+  transform: translateY(-1px);
+}
+
+.btn-login:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.login-error {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #c1443c;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.user-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-nav a {
+  text-decoration: none;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-wrap {
+  display: grid;
+  gap: 20px;
+  padding-bottom: 40px;
+}
+
+.admin-panel {
+  padding: 20px 22px 24px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.admin-form label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.admin-form input,
+.admin-form select,
+.dialog input,
+.dialog select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  box-sizing: border-box;
+  background: var(--white);
+}
+
+.admin-form-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.badge-papel {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.badge-papel.admin {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.badge-papel.editor {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.badge-papel.consulta {
+  background: #f2f2f2;
+  color: var(--ink-soft);
+}
+
+.badge-papel.usuario {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.badge-status {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.badge-status.ativo {
+  color: var(--green-dark);
+}
+
+.badge-status.inativo {
+  color: #c1443c;
+}
+
+@media (max-width: 720px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .login-card {
+    padding: 22px 18px 26px;
+  }
+}

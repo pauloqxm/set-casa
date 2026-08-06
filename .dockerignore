@@ -1,0 +1,14 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.env
+.env.*
+data/
+*.xlsx
+*.db
+Painel_Casa_do_Trabalhador.html
+DESIGN-SYSTEM.md
+iniciar.bat
+_tmp_*
+.cursor

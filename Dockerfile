@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY server.py db.py storage.py import_xlsx.py ./
 COPY web/ ./web/
+COPY data/painel.json ./data/painel.json
 
 EXPOSE 8765
 

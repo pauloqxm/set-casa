@@ -4,7 +4,6 @@ __pycache__
 *.pyc
 .env
 .env.*
-data/
 *.xlsx
 *.db
 Painel_Casa_do_Trabalhador.html
@@ -12,3 +11,7 @@ DESIGN-SYSTEM.md
 iniciar.bat
 _tmp_*
 .cursor
+
+# Ignora uploads locais, mas mantém o seed JSON no image
+data/uploads/
+data/*.db

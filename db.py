@@ -982,18 +982,18 @@ def load_painel() -> dict:
 
 
 def migrate_from_json_if_needed() -> bool:
-    if USE_POSTGRES:
-        return False
-    if DB_PATH.exists():
-        with connect() as conn:
-            init_db(conn)
-            count = conn.execute("SELECT COUNT(*) AS n FROM itens").fetchone()["n"]
-            if count > 0:
-                return False
+    """Importa data/painel.json se a tabela itens estiver vazia."""
+    with connect() as conn:
+        init_db(conn)
+        count = conn.execute("SELECT COUNT(*) AS n FROM itens").fetchone()["n"]
+        if count > 0:
+            return False
     if not JSON_LEGACY.exists():
         return False
     payload = json.loads(JSON_LEGACY.read_text(encoding="utf-8"))
     itens = payload.get("itens", [])
+    if not itens:
+        return False
     replace_all_itens(
         itens,
         fonte=payload.get("fonte", JSON_LEGACY.name),
@@ -1004,7 +1004,8 @@ def migrate_from_json_if_needed() -> bool:
             set_meta(conn, "atualizado_em", payload["atualizado_em"])
         if payload.get("projeto"):
             set_meta(conn, "projeto", payload["projeto"])
-    print(f"Migrados {len(itens)} itens de {JSON_LEGACY.name} -> {DB_PATH}")
+    destino = "postgres" if USE_POSTGRES else str(DB_PATH)
+    print(f"Migrados {len(itens)} itens de {JSON_LEGACY.name} -> {destino}")
     return True
 
 
@@ -1298,16 +1299,18 @@ def destroy_session(token: str | None) -> None:
 
 
 def ensure_db() -> str:
-    """Garante schema. Em produção (Postgres) não importa planilha."""
+    """Garante schema. Em Postgres/SQLite vazio, tenta carregar painel.json."""
     with connect() as conn:
         init_db(conn)
         count = conn.execute("SELECT COUNT(*) AS n FROM itens").fetchone()["n"]
 
     if USE_POSTGRES:
         if count == 0:
+            if migrate_from_json_if_needed():
+                return "postgres"
             print(
-                "Postgres OK (sem itens ainda). "
-                "Rode migrate_sqlite_to_supabase.py para carregar os dados locais."
+                "Postgres OK (sem itens). "
+                "Inclua data/painel.json no deploy ou rode migrate_sqlite_to_supabase.py."
             )
         return "postgres"
 

@@ -76,12 +76,13 @@
     sortKey: "prazo",
     sortDir: 1,
     cardsPage: 1,
+    showConcluidos: false,
     expanded: {},
     historicoCache: {},
     user: null,
   };
 
-  const CARDS_PER_PAGE = 6;
+  const CARDS_PER_PAGE = 8;
 
   function canEdit() {
     return Boolean(state.user && state.user.pode_editar);
@@ -141,6 +142,7 @@
     editExcluir: document.getElementById("editExcluir"),
     editSubmit: document.getElementById("editSubmit"),
     btnNovaAcao: document.getElementById("btnNovaAcao"),
+    btnToggleConcluidos: document.getElementById("btnToggleConcluidos"),
     userChip: document.getElementById("userChip"),
     linkAdmin: document.getElementById("linkAdmin"),
     btnSair: document.getElementById("btnSair"),
@@ -207,6 +209,27 @@
     return s === "concluido" || s === "nao se aplica";
   }
 
+  function isConcluido(status) {
+    const s = (status || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    return s === "concluido";
+  }
+
+  function syncConcluidosButton() {
+    if (!el.btnToggleConcluidos) return;
+    el.btnToggleConcluidos.textContent = state.showConcluidos
+      ? "Ocultar concluídos"
+      : "Exibir concluídos";
+    el.btnToggleConcluidos.setAttribute(
+      "aria-pressed",
+      state.showConcluidos ? "true" : "false"
+    );
+    el.btnToggleConcluidos.classList.toggle("is-active", state.showConcluidos);
+  }
+
   function daysLabel(item) {
     if (isClosedStatus(item.status)) return { text: "", cls: "" };
     const d = item.dias_prazo;
@@ -262,6 +285,13 @@
       state.itens.filter((item) => {
         if (state.bloco !== "todas" && item.bloco !== state.bloco) return false;
         if (state.status && item.status !== state.status) return false;
+        if (
+          !state.showConcluidos &&
+          !state.status &&
+          isConcluido(item.status)
+        ) {
+          return false;
+        }
         if (state.prioridade && item.prioridade !== state.prioridade) return false;
         if (state.responsavel && item.responsavel !== state.responsavel) return false;
         if (!q) return true;
@@ -782,6 +812,7 @@
   function renderViews() {
     const items = filteredItems();
     el.resultCount.textContent = `${items.length} item(ns) exibido(s)`;
+    syncConcluidosButton();
     document.querySelectorAll(".view-btn").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.view === state.view);
     });
@@ -1312,6 +1343,13 @@
     el.editExcluir.addEventListener("click", deleteAcao);
   }
   el.btnNovaAcao.addEventListener("click", openCreate);
+  if (el.btnToggleConcluidos) {
+    el.btnToggleConcluidos.addEventListener("click", () => {
+      state.showConcluidos = !state.showConcluidos;
+      state.cardsPage = 1;
+      renderViews();
+    });
+  }
   if (el.editFoto) {
     syncFotoCaptureMode();
     window.addEventListener("resize", syncFotoCaptureMode);

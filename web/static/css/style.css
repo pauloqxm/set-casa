@@ -974,7 +974,7 @@ textarea {
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
 
@@ -1131,6 +1131,12 @@ textarea {
   padding: 12px 16px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.btn-ghost.is-active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-dark);
 }
 
 .btn-small {

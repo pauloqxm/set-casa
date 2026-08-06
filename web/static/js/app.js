@@ -140,6 +140,7 @@
     userChip: document.getElementById("userChip"),
     linkAdmin: document.getElementById("linkAdmin"),
     btnSair: document.getElementById("btnSair"),
+    btnTopo: document.getElementById("btnTopo"),
   };
 
   function fmtDate(iso) {
@@ -1253,6 +1254,11 @@
     el.btnSair.addEventListener("click", async () => {
       await fetch("/api/logout", { method: "POST" });
       location.replace("/login.html");
+    });
+  }
+  if (el.btnTopo) {
+    el.btnTopo.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
 

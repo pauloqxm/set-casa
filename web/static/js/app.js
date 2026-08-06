@@ -134,6 +134,7 @@
     fotoPreviewWrap: document.getElementById("fotoPreviewWrap"),
     editCancel: document.getElementById("editCancel"),
     editDelete: document.getElementById("editDelete"),
+    editExcluir: document.getElementById("editExcluir"),
     editSubmit: document.getElementById("editSubmit"),
     btnNovaAcao: document.getElementById("btnNovaAcao"),
     userChip: document.getElementById("userChip"),
@@ -879,6 +880,7 @@
     el.editTitle.textContent = item.entrega || `Item ${item.id}`;
     el.editSubmit.textContent = "Salvar";
     el.editDelete.style.display = "";
+    if (el.editExcluir) el.editExcluir.style.display = "";
     fillFrenteSelect(item.frente || "");
     fillStatusSelect(item.status || "");
     el.editEntrega.value = item.entrega || "";
@@ -902,6 +904,7 @@
     el.editTitle.textContent = "Incluir nova entrega no monitoramento";
     el.editSubmit.textContent = "Incluir ação";
     el.editDelete.style.display = "none";
+    if (el.editExcluir) el.editExcluir.style.display = "none";
     fillFrenteSelect(FRENTES_PADRAO[0]);
     fillStatusSelect("Não iniciado");
     el.editEntrega.value = "";
@@ -972,6 +975,39 @@
     state.atualizadoEm = data.atualizado_em || "";
     renderFilters();
     renderAll();
+  }
+
+  async function deleteAcao() {
+    if (!canEdit()) {
+      alert("Seu perfil é Consulta: apenas visualização.");
+      return;
+    }
+    const id = el.editId.value;
+    if (!id) return;
+    const titulo = el.editEntrega.value.trim() || `Item ${id}`;
+    if (
+      !confirm(
+        `Excluir permanentemente esta ação?\n\n${titulo}\n\nEsta operação não pode ser desfeita.`
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/itens/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      let msg = "Não foi possível excluir a ação.";
+      try {
+        const err = await res.json();
+        if (err.erro) msg = err.erro;
+      } catch (_) {}
+      alert(msg);
+      return;
+    }
+    el.dialog.close();
+    delete state.historicoCache[id];
+    delete state.expanded[id];
+    await loadPainel();
   }
 
   async function clearProxima() {
@@ -1183,6 +1219,9 @@
   el.form.addEventListener("submit", saveItem);
   el.editCancel.addEventListener("click", () => el.dialog.close());
   el.editDelete.addEventListener("click", clearProxima);
+  if (el.editExcluir) {
+    el.editExcluir.addEventListener("click", deleteAcao);
+  }
   el.btnNovaAcao.addEventListener("click", openCreate);
   if (el.editFoto) {
     syncFotoCaptureMode();

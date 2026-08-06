@@ -1135,6 +1135,12 @@ textarea {
   margin-left: auto;
 }
 
+.dialog-actions-left {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .btn-danger {
   appearance: none;
   border: 1px solid #c1443c;
@@ -1150,6 +1156,15 @@ textarea {
 .btn-danger:hover {
   background: #c1443c;
   color: var(--white);
+}
+
+.btn-danger-solid {
+  background: #c1443c;
+  color: var(--white);
+}
+
+.btn-danger-solid:hover {
+  background: #a33832;
 }
 
 .dialog-dates {

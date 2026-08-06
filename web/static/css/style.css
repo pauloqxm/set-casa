@@ -552,6 +552,10 @@ textarea {
   margin-top: 8px;
   display: grid;
   gap: 8px;
+  max-height: min(320px, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .attention-item {

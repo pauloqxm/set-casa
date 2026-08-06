@@ -75,10 +75,13 @@
     view: "cards",
     sortKey: "prazo",
     sortDir: 1,
+    cardsPage: 1,
     expanded: {},
     historicoCache: {},
     user: null,
   };
+
+  const CARDS_PER_PAGE = 6;
 
   function canEdit() {
     return Boolean(state.user && state.user.pode_editar);
@@ -97,6 +100,7 @@
     frenteTag: document.getElementById("frenteTag"),
     tabs: document.getElementById("tabs"),
     cards: document.getElementById("cards"),
+    cardsPager: document.getElementById("cardsPager"),
     tablePanel: document.getElementById("tablePanel"),
     tableBody: document.getElementById("tableBody"),
     resultCount: document.getElementById("resultCount"),
@@ -622,15 +626,74 @@
     ).join("");
   }
 
-  function renderCards() {
-    const items = filteredItems();
-    el.resultCount.textContent = `${items.length} item(ns) exibido(s)`;
-    if (!items.length) {
-      el.cards.innerHTML =
-        '<div class="empty">Nenhuma entrega encontrada com os filtros atuais.</div>';
+  function sortByTempoAsc(list) {
+    return [...list].sort((a, b) => {
+      const da = a.dias_prazo;
+      const db = b.dias_prazo;
+      let cmp = 0;
+      if (da == null && db == null) cmp = 0;
+      else if (da == null) cmp = 1;
+      else if (db == null) cmp = -1;
+      else cmp = da - db;
+      if (cmp !== 0) return cmp;
+      return String(a.id).localeCompare(String(b.id), "pt-BR");
+    });
+  }
+
+  function setCardsPage(page, totalPages) {
+    state.cardsPage = Math.min(Math.max(1, page), Math.max(1, totalPages));
+    renderCards();
+  }
+
+  function renderCardsPager(total, page, totalPages) {
+    if (!el.cardsPager) return;
+    if (totalPages <= 1) {
+      el.cardsPager.hidden = true;
+      el.cardsPager.innerHTML = "";
       return;
     }
-    el.cards.innerHTML = items
+    el.cardsPager.hidden = false;
+    const buttons = [];
+    buttons.push(
+      `<button type="button" class="pager-btn" data-page="prev" ${page <= 1 ? "disabled" : ""} aria-label="Página anterior">‹</button>`
+    );
+    for (let p = 1; p <= totalPages; p += 1) {
+      const active = p === page ? " is-active" : "";
+      buttons.push(
+        `<button type="button" class="pager-btn${active}" data-page="${p}" aria-label="Página ${p}" aria-current="${p === page ? "page" : "false"}">${p}</button>`
+      );
+    }
+    buttons.push(
+      `<button type="button" class="pager-btn" data-page="next" ${page >= totalPages ? "disabled" : ""} aria-label="Próxima página">›</button>`
+    );
+    const from = (page - 1) * CARDS_PER_PAGE + 1;
+    const to = Math.min(page * CARDS_PER_PAGE, total);
+    el.cardsPager.innerHTML = `
+      <p class="pager-meta">Exibindo ${from}–${to} de ${total} · ordenado do menor ao maior tempo</p>
+      <div class="pager-buttons">${buttons.join("")}</div>
+    `;
+  }
+
+  function renderCards() {
+    const items = sortByTempoAsc(filteredItems());
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / CARDS_PER_PAGE));
+    if (state.cardsPage > totalPages) state.cardsPage = totalPages;
+    if (state.cardsPage < 1) state.cardsPage = 1;
+    const page = state.cardsPage;
+    const pageItems = items.slice(
+      (page - 1) * CARDS_PER_PAGE,
+      page * CARDS_PER_PAGE
+    );
+
+    el.resultCount.textContent = `${total} item(ns) exibido(s)`;
+    if (!total) {
+      el.cards.innerHTML =
+        '<div class="empty">Nenhuma entrega encontrada com os filtros atuais.</div>';
+      renderCardsPager(0, 1, 1);
+      return;
+    }
+    el.cards.innerHTML = pageItems
       .map((item) => {
         const width = itemProgress(item);
         const pctLabel =
@@ -671,7 +734,9 @@
       })
       .join("");
 
-    items.forEach((item) => {
+    renderCardsPager(total, page, totalPages);
+
+    pageItems.forEach((item) => {
       if (state.expanded[item.id] && !state.historicoCache[item.id]) {
         loadHistorico(item.id);
       }
@@ -720,13 +785,15 @@
     document.querySelectorAll(".view-btn").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.view === state.view);
     });
+    const cardsSection = el.cards.closest(".cards-section") || el.cards;
     if (state.view === "table") {
-      el.cards.classList.add("is-hidden");
+      cardsSection.classList.add("is-hidden");
       el.tablePanel.classList.remove("is-hidden");
+      if (el.cardsPager) el.cardsPager.hidden = true;
       renderTable();
     } else {
       el.tablePanel.classList.add("is-hidden");
-      el.cards.classList.remove("is-hidden");
+      cardsSection.classList.remove("is-hidden");
       renderCards();
     }
   }
@@ -1118,6 +1185,7 @@
 
   function setBloco(bloco) {
     state.bloco = bloco || "todas";
+    state.cardsPage = 1;
     renderTabs();
     renderBlocks();
     renderViews();
@@ -1140,6 +1208,7 @@
     const btn = e.target.closest("[data-view]");
     if (!btn) return;
     state.view = btn.dataset.view;
+    state.cardsPage = 1;
     renderViews();
   });
 
@@ -1178,6 +1247,21 @@
     openEdit(btn.dataset.edit);
   });
 
+  if (el.cardsPager) {
+    el.cardsPager.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-page]");
+      if (!btn || btn.disabled) return;
+      const items = sortByTempoAsc(filteredItems());
+      const totalPages = Math.max(1, Math.ceil(items.length / CARDS_PER_PAGE));
+      const raw = btn.dataset.page;
+      let page = state.cardsPage;
+      if (raw === "prev") page -= 1;
+      else if (raw === "next") page += 1;
+      else page = Number(raw) || 1;
+      setCardsPage(page, totalPages);
+    });
+  }
+
   el.tableBody.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-edit]");
     if (!btn) return;
@@ -1202,18 +1286,22 @@
 
   el.filterStatus.addEventListener("change", () => {
     state.status = el.filterStatus.value;
+    state.cardsPage = 1;
     renderViews();
   });
   el.filterPrioridade.addEventListener("change", () => {
     state.prioridade = el.filterPrioridade.value;
+    state.cardsPage = 1;
     renderViews();
   });
   el.filterResponsavel.addEventListener("change", () => {
     state.responsavel = el.filterResponsavel.value;
+    state.cardsPage = 1;
     renderViews();
   });
   el.filterSearch.addEventListener("input", () => {
     state.search = el.filterSearch.value;
+    state.cardsPage = 1;
     renderViews();
   });
 

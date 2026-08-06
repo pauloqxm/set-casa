@@ -368,54 +368,92 @@
 
   function renderKpis() {
     const k = state.kpis || {};
+    const icons = {
+      total:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2zm2 4v2h6V7H9zm0 4v2h6v-2H9z"/></svg>',
+      check:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.2 13.3 6-6-1.4-1.4-4.6 4.6-2.2-2.2-1.4 1.4 3.6 3.6z"/></svg>',
+      gear:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.8 7.8 0 0 0 .1-1l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0-.1 1l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg>',
+      people:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zM8 12a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 8 12zm8 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4zM8 14c-.3 0-.7 0-1 .1C4.6 14.5 2 15.7 2 18v2h4v-2c0-1.5.8-2.7 2.1-3.6-.7-.2-1.4-.4-2.1-.4z"/></svg>',
+      clock:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2z"/></svg>',
+      alert:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 21h22L12 3zm0 6h2v5h-2V9zm0 7h2v2h-2v-2z"/></svg>',
+    };
     const cards = [
       {
+        id: "total",
+        tone: "green",
+        icon: icons.total,
         head: "Total",
         value: k.total ?? "—",
         text: "Ações e entregas monitoradas",
-        status: `ESCOPO ATIVO`,
+        status: "Escopo ativo",
       },
       {
+        id: "concluidas",
+        tone: "green",
+        icon: icons.check,
         head: "Concluídas",
         value: k.concluidos ?? 0,
         text: "Itens finalizados",
-        status: `PROGRESSO ${k.progresso_pct ?? 0}%`,
-        hero: true,
+        status: `Progresso ${k.progresso_pct ?? 0}%`,
+        concluido: true,
       },
       {
+        id: "andamento",
+        tone: "blue",
+        icon: icons.gear,
         head: "Andamento",
         value: k.em_andamento ?? 0,
         text: "Em execução agora",
-        status: "STATUS",
+        status: "Status",
       },
       {
+        id: "terceiros",
+        tone: "teal",
+        icon: icons.people,
         head: "Terceiros",
         value: k.aguardando_terceiros ?? 0,
         text: "Aguardando ação externa",
-        status: "DEPENDÊNCIA",
+        status: "Dependência",
       },
       {
+        id: "nao-iniciadas",
+        tone: "orange",
+        icon: icons.clock,
         head: "Não iniciadas",
         value: k.nao_iniciados ?? 0,
         text: "Ainda sem início formal",
-        status: "FILA",
+        status: "Fila",
       },
       {
+        id: "criticas",
+        tone: "red",
+        icon: icons.alert,
         head: "Críticas / Atraso",
         value: `${k.criticas_abertas ?? 0} / ${k.atrasadas ?? 0}`,
         text: "Críticas abertas e prazos vencidos",
-        status: "ATENÇÃO",
+        status: "Atenção",
       },
-    ];
+    ].filter((c) => state.showConcluidos || !c.concluido);
+
+    el.kpis.dataset.count = String(cards.length);
     el.kpis.innerHTML = cards
       .map(
         (c) => `
-      <article class="card">
-        <div class="card-head">${c.head}</div>
-        <div class="card-body">
-          <p class="card-value${c.hero ? " hero" : ""}">${c.value}</p>
-          <p class="card-text">${c.text}</p>
-          <div class="card-status">${c.status}</div>
+      <article class="kpi-card kpi-${c.tone}">
+        <div class="kpi-top">
+          <span class="kpi-icon">${c.icon}</span>
+          <span class="kpi-label">${c.head}</span>
+        </div>
+        <p class="kpi-value">${c.value}</p>
+        <p class="kpi-text">${c.text}</p>
+        <div class="kpi-foot">
+          <span>${c.status}</span>
+          <i class="kpi-dot" aria-hidden="true"></i>
         </div>
       </article>`
       )
@@ -1347,6 +1385,7 @@
     el.btnToggleConcluidos.addEventListener("click", () => {
       state.showConcluidos = !state.showConcluidos;
       state.cardsPage = 1;
+      renderKpis();
       renderViews();
     });
   }

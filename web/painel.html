@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel de Projeto · SET / IDT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+    <link rel="stylesheet" href="/static/css/portfolio.css" />
+  </head>
+  <body>
+    <div class="page" id="topo">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Acompanhamento gerencial</p>
+              <h1 id="projTitle">Painel do projeto</h1>
+              <p class="topbar-meta">
+                Atualizado: <span id="atualizadoEm">—</span>
+              </p>
+            </div>
+          </div>
+          <div class="user-nav" id="userNav">
+            <span class="user-chip" id="userChip" hidden>—</span>
+            <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
+            <button type="button" class="btn-ghost btn-small" id="btnSair">
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="wrap">
+        <section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+        <section class="panel" aria-labelledby="frentesTitle">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2 id="frentesTitle">Frentes de trabalho</h2>
+              <p>Composição do progresso por status em cada frente</p>
+            </div>
+          </div>
+          <div class="blocks" id="blocksRow"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Ações do projeto</h2>
+              <p id="resultCount"></p>
+            </div>
+            <button type="button" class="btn-run btn-small" id="btnNovaAcao">
+              Nova ação
+            </button>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table" id="mainTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Frente</th>
+                  <th>Entrega / Ação</th>
+                  <th>Responsável</th>
+                  <th>Prioridade</th>
+                  <th>Prazo</th>
+                  <th>Status</th>
+                  <th>Próxima providência</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-strip" aria-hidden="true">
+          <span class="strip-green"></span>
+          <span class="strip-blue"></span>
+          <span class="strip-orange"></span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-topo" id="btnTopo">↑ Voltar ao topo</button>
+        <p>Painel de projeto — SET / IDT</p>
+      </footer>
+    </div>
+
+    <dialog id="editDialog" class="dialog">
+      <form method="dialog" id="editForm">
+        <header>
+          <p class="eyebrow" id="editEyebrow">Editar ação</p>
+          <h3 id="editTitle">—</h3>
+        </header>
+        <input type="hidden" id="editId" />
+
+        <label>
+          Entrega / Ação
+          <input id="editEntrega" type="text" required />
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Frente
+            <input id="editFrente" type="text" placeholder="Ex.: Infraestrutura" />
+          </label>
+          <label>
+            Responsável
+            <input id="editResponsavel" type="text" />
+          </label>
+        </div>
+        <label>
+          Parceiros
+          <input id="editParceiros" type="text" />
+        </label>
+        <label>
+          Status
+          <select id="editStatus"></select>
+        </label>
+        <label>
+          Prioridade
+          <select id="editPrioridade">
+            <option value="">—</option>
+            <option>Crítica</option>
+            <option>Alta</option>
+            <option>Média</option>
+            <option>Baixa</option>
+          </select>
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Data da mudança
+            <input id="editDataMudanca" type="date" />
+          </label>
+          <label>
+            Prazo
+            <input id="editPrazo" type="date" />
+          </label>
+        </div>
+        <label>
+          %
+          <input id="editPct" type="number" min="0" max="100" step="1" />
+        </label>
+        <label>
+          Próxima providência
+          <textarea id="editProxima" rows="3"></textarea>
+        </label>
+        <label>
+          Observações
+          <textarea id="editObs" rows="3"></textarea>
+        </label>
+        <div class="dialog-actions">
+          <div class="dialog-actions-left">
+            <button type="button" class="btn-danger btn-danger-solid" id="editExcluir">
+              Excluir ação
+            </button>
+          </div>
+          <div class="dialog-actions-right">
+            <button type="button" class="btn-ghost" id="editCancel">Cancelar</button>
+            <button type="submit" class="btn-run" id="editSubmit">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/js/painel-generico.js"></script>
+  </body>
+</html>

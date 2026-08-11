@@ -76,6 +76,7 @@ ITEM_FIELDS = (
     "foto",
     "bloco",
     "bloco_label",
+    "projeto_id",
 )
 
 EDITABLE_FIELDS = (
@@ -125,6 +126,18 @@ PAPEL_LABELS = {
     "editor": "Editor",
     "consulta": "Consulta",
 }
+
+# Projeto legado: todo dado existente antes do portfólio pertence a ele.
+CASA_TRABALHADOR_ID = "casa-trabalhador"
+
+DEFAULT_STATUS_OPTIONS = [
+    "Não iniciado",
+    "Em andamento",
+    "Aguardando terceiros",
+    "Concluído",
+    "Sobrestado",
+    "Não se aplica",
+]
 
 
 # --- Compatibilidade SQLite / Postgres ---------------------------------------
@@ -304,14 +317,27 @@ def bloco_from_frente(frente: str) -> tuple[str, str]:
     return bloco, BLOCO_LABELS[bloco]
 
 
-def next_item_id(conn: _ConnProxy) -> str:
-    rows = conn.execute("SELECT id FROM itens").fetchall()
+def next_item_id(conn: _ConnProxy, projeto_id: str = CASA_TRABALHADOR_ID) -> str:
+    rows = conn.execute(
+        "SELECT id FROM itens WHERE projeto_id=?", (projeto_id,)
+    ).fetchall()
+    if projeto_id == CASA_TRABALHADOR_ID:
+        max_n = 0
+        for row in rows:
+            raw = str(row["id"] or "").strip()
+            if raw.isdigit():
+                max_n = max(max_n, int(raw))
+        return f"{max_n + 1:03d}"
+
+    # Projetos novos usam IDs namespaced (ex.: "meu-projeto-001") para nunca
+    # colidir com o projeto legado nem entre si, já que "itens.id" é global.
+    prefix = f"{projeto_id}-"
     max_n = 0
     for row in rows:
         raw = str(row["id"] or "").strip()
-        if raw.isdigit():
-            max_n = max(max_n, int(raw))
-    return f"{max_n + 1:03d}"
+        if raw.startswith(prefix) and raw[len(prefix):].isdigit():
+            max_n = max(max_n, int(raw[len(prefix):]))
+    return f"{prefix}{max_n + 1:03d}"
 
 
 def fmt_br_date(value: str) -> str:
@@ -449,6 +475,7 @@ CREATE TABLE IF NOT EXISTS itens (
     foto TEXT NOT NULL DEFAULT '',
     bloco TEXT NOT NULL DEFAULT 'outras',
     bloco_label TEXT NOT NULL DEFAULT 'Outras',
+    projeto_id TEXT NOT NULL DEFAULT 'casa-trabalhador',
     atualizado_em TEXT NOT NULL DEFAULT ''
 );
 
@@ -463,6 +490,8 @@ CREATE TABLE IF NOT EXISTS historico (
     tipo TEXT NOT NULL DEFAULT 'atualizacao',
     resumo TEXT NOT NULL DEFAULT '',
     detalhes TEXT NOT NULL DEFAULT '',
+    usuario_id INTEGER,
+    usuario_nome TEXT NOT NULL DEFAULT '',
     FOREIGN KEY(item_id) REFERENCES itens(id)
 );
 
@@ -491,6 +520,48 @@ CREATE TABLE IF NOT EXISTS sessoes (
 
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_sessoes_expira ON sessoes(expira_em);
+
+CREATE TABLE IF NOT EXISTS projetos (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL DEFAULT '',
+    descricao TEXT NOT NULL DEFAULT '',
+    gerente_usuario_id INTEGER,
+    prazo_conclusao TEXT NOT NULL DEFAULT '',
+    config_json TEXT NOT NULL DEFAULT '{}',
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT '',
+    atualizado_em TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY(gerente_usuario_id) REFERENCES usuarios(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_projetos_ativo ON projetos(ativo);
+
+CREATE TABLE IF NOT EXISTS usuario_projetos (
+    usuario_id INTEGER NOT NULL,
+    projeto_id TEXT NOT NULL,
+    papel TEXT NOT NULL DEFAULT 'consulta',
+    criado_em TEXT NOT NULL DEFAULT '',
+    atualizado_em TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (usuario_id, projeto_id),
+    FOREIGN KEY(usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY(projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_usuario_projetos_projeto ON usuario_projetos(projeto_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projeto_id TEXT,
+    entidade TEXT NOT NULL,
+    entidade_id TEXT NOT NULL DEFAULT '',
+    acao TEXT NOT NULL,
+    usuario_id INTEGER,
+    usuario_nome TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL,
+    detalhes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_projeto ON audit_log(projeto_id, criado_em);
 """
 
 SCHEMA_POSTGRES = """
@@ -517,6 +588,7 @@ CREATE TABLE IF NOT EXISTS itens (
     foto TEXT NOT NULL DEFAULT '',
     bloco TEXT NOT NULL DEFAULT 'outras',
     bloco_label TEXT NOT NULL DEFAULT 'Outras',
+    projeto_id TEXT NOT NULL DEFAULT 'casa-trabalhador',
     atualizado_em TEXT NOT NULL DEFAULT ''
 );
 
@@ -531,6 +603,8 @@ CREATE TABLE IF NOT EXISTS historico (
     tipo TEXT NOT NULL DEFAULT 'atualizacao',
     resumo TEXT NOT NULL DEFAULT '',
     detalhes TEXT NOT NULL DEFAULT '',
+    usuario_id INTEGER,
+    usuario_nome TEXT NOT NULL DEFAULT '',
     FOREIGN KEY(item_id) REFERENCES itens(id)
 );
 
@@ -559,6 +633,48 @@ CREATE TABLE IF NOT EXISTS sessoes (
 
 CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_sessoes_expira ON sessoes(expira_em);
+
+CREATE TABLE IF NOT EXISTS projetos (
+    id TEXT PRIMARY KEY,
+    nome TEXT NOT NULL DEFAULT '',
+    descricao TEXT NOT NULL DEFAULT '',
+    gerente_usuario_id INTEGER,
+    prazo_conclusao TEXT NOT NULL DEFAULT '',
+    config_json TEXT NOT NULL DEFAULT '{}',
+    ativo INTEGER NOT NULL DEFAULT 1,
+    criado_em TEXT NOT NULL DEFAULT '',
+    atualizado_em TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY(gerente_usuario_id) REFERENCES usuarios(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_projetos_ativo ON projetos(ativo);
+
+CREATE TABLE IF NOT EXISTS usuario_projetos (
+    usuario_id INTEGER NOT NULL,
+    projeto_id TEXT NOT NULL,
+    papel TEXT NOT NULL DEFAULT 'consulta',
+    criado_em TEXT NOT NULL DEFAULT '',
+    atualizado_em TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (usuario_id, projeto_id),
+    FOREIGN KEY(usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY(projeto_id) REFERENCES projetos(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_usuario_projetos_projeto ON usuario_projetos(projeto_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    projeto_id TEXT,
+    entidade TEXT NOT NULL,
+    entidade_id TEXT NOT NULL DEFAULT '',
+    acao TEXT NOT NULL,
+    usuario_id INTEGER,
+    usuario_nome TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL,
+    detalhes TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_projeto ON audit_log(projeto_id, criado_em);
 """
 
 
@@ -571,26 +687,43 @@ def init_db(conn: _ConnProxy) -> None:
     _seed_historico_inicial(conn)
     _migrate_papeis(conn)
     _seed_admin_inicial(conn)
+    _seed_projeto_casa_trabalhador(conn)
+    _seed_usuario_projetos_inicial(conn)
 
 
 def _ensure_columns(conn: _ConnProxy) -> None:
     if conn.dialect == "postgres":
-        # colunas já estão no CREATE TABLE; garante foto em bases antigas
-        row = conn.execute(
-            """
-            SELECT 1 AS ok FROM information_schema.columns
-            WHERE table_name='itens' AND column_name='foto'
-            """
-        ).fetchone()
-        if not row:
+        def _has_col(table: str, col: str) -> bool:
+            row = conn.execute(
+                """
+                SELECT 1 AS ok FROM information_schema.columns
+                WHERE table_name=? AND column_name=?
+                """,
+                (table, col),
+            ).fetchone()
+            return bool(row)
+
+        # colunas já estão no CREATE TABLE; garante compatibilidade com bases antigas
+        if not _has_col("itens", "foto"):
             conn.execute("ALTER TABLE itens ADD COLUMN foto TEXT NOT NULL DEFAULT ''")
+        if not _has_col("itens", "projeto_id"):
+            conn.execute(
+                f"ALTER TABLE itens ADD COLUMN projeto_id TEXT NOT NULL "
+                f"DEFAULT '{CASA_TRABALHADOR_ID}'"
+            )
+        # A coluna já existe agora (recém-criada ou já presente no CREATE TABLE)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_itens_projeto ON itens(projeto_id)"
+        )
+        if not _has_col("historico", "usuario_id"):
+            conn.execute("ALTER TABLE historico ADD COLUMN usuario_id INTEGER")
+        if not _has_col("historico", "usuario_nome"):
+            conn.execute(
+                "ALTER TABLE historico ADD COLUMN usuario_nome TEXT NOT NULL DEFAULT ''"
+            )
         ensure_uploads_dir()
         return
 
-    cols = {r["name"] for r in conn.execute("PRAGMA table_info(itens)").fetchall()}
-    # sqlite Row from PRAGMA — adapt: PRAGMA returns tuples sometimes
-    # With our proxy dict conversion, keys may be index-based from pragma
-    # Re-query safely:
     raw = conn._conn.execute("PRAGMA table_info(itens)").fetchall()
     cols = {row[1] for row in raw}
     if "data_mudanca" not in cols:
@@ -604,7 +737,79 @@ def _ensure_columns(conn: _ConnProxy) -> None:
         )
     if "foto" not in cols:
         conn.execute("ALTER TABLE itens ADD COLUMN foto TEXT NOT NULL DEFAULT ''")
+    if "projeto_id" not in cols:
+        conn.execute(
+            f"ALTER TABLE itens ADD COLUMN projeto_id TEXT NOT NULL "
+            f"DEFAULT '{CASA_TRABALHADOR_ID}'"
+        )
+    # A coluna já existe agora (recém-criada ou já presente no CREATE TABLE)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_projeto ON itens(projeto_id)")
+
+    hist_raw = conn._conn.execute("PRAGMA table_info(historico)").fetchall()
+    hist_cols = {row[1] for row in hist_raw}
+    if "usuario_id" not in hist_cols:
+        conn.execute("ALTER TABLE historico ADD COLUMN usuario_id INTEGER")
+    if "usuario_nome" not in hist_cols:
+        conn.execute(
+            "ALTER TABLE historico ADD COLUMN usuario_nome TEXT NOT NULL DEFAULT ''"
+        )
     ensure_uploads_dir()
+
+
+def _seed_projeto_casa_trabalhador(conn: _ConnProxy) -> None:
+    row = conn.execute(
+        "SELECT 1 FROM projetos WHERE id=?", (CASA_TRABALHADOR_ID,)
+    ).fetchone()
+    if row:
+        return
+    now = datetime.now().isoformat(timespec="seconds")
+    config = {
+        "blocos": BLOCO_LABELS,
+        "frente_to_bloco": FRENTE_TO_BLOCO,
+        "status_options": DEFAULT_STATUS_OPTIONS,
+    }
+    conn.execute(
+        """
+        INSERT INTO projetos (
+            id, nome, descricao, gerente_usuario_id, prazo_conclusao,
+            config_json, ativo, criado_em, atualizado_em
+        ) VALUES (?, ?, ?, NULL, ?, ?, 1, ?, ?)
+        """,
+        (
+            CASA_TRABALHADOR_ID,
+            "Casa do Trabalhador",
+            "SET / IDT · Acompanhamento gerencial",
+            "2026-11-26",
+            json.dumps(config, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+
+
+def _seed_usuario_projetos_inicial(conn: _ConnProxy) -> None:
+    """Garante que todo usuário existente tenha acesso ao projeto legado,
+    reproduzindo o papel global que ele já possuía antes do portfólio."""
+    usuarios = conn.execute("SELECT id, papel FROM usuarios").fetchall()
+    for u in usuarios:
+        exists = conn.execute(
+            "SELECT 1 FROM usuario_projetos WHERE usuario_id=? AND projeto_id=?",
+            (u["id"], CASA_TRABALHADOR_ID),
+        ).fetchone()
+        if exists:
+            continue
+        try:
+            papel = normalize_papel(u.get("papel") or "consulta")
+        except ValueError:
+            papel = "consulta"
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            """
+            INSERT INTO usuario_projetos (usuario_id, projeto_id, papel, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (u["id"], CASA_TRABALHADOR_ID, papel, now, now),
+        )
 
 
 def _seed_historico_inicial(conn: _ConnProxy) -> None:
@@ -647,11 +852,13 @@ def add_historico(
     resumo: str,
     detalhes: dict,
     criado_em: str | None = None,
+    usuario_id: int | None = None,
+    usuario_nome: str = "",
 ) -> None:
     conn.execute(
         """
-        INSERT INTO historico(item_id, criado_em, tipo, resumo, detalhes)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO historico(item_id, criado_em, tipo, resumo, detalhes, usuario_id, usuario_nome)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             item_id,
@@ -659,8 +866,16 @@ def add_historico(
             tipo,
             resumo,
             json.dumps(detalhes, ensure_ascii=False),
+            usuario_id,
+            usuario_nome or "",
         ),
     )
+
+
+def _autor_from_usuario(usuario: dict | None) -> tuple[int | None, str]:
+    if not usuario:
+        return None, ""
+    return usuario.get("id"), (usuario.get("nome") or usuario.get("usuario") or "")
 
 
 def list_historico(item_id: str) -> list[dict]:
@@ -668,7 +883,7 @@ def list_historico(item_id: str) -> list[dict]:
         init_db(conn)
         rows = conn.execute(
             """
-            SELECT id, item_id, criado_em, tipo, resumo, detalhes
+            SELECT id, item_id, criado_em, tipo, resumo, detalhes, usuario_id, usuario_nome
             FROM historico
             WHERE item_id = ?
             ORDER BY criado_em DESC, id DESC
@@ -689,6 +904,8 @@ def list_historico(item_id: str) -> list[dict]:
                     "tipo": row["tipo"],
                     "resumo": row["resumo"],
                     "detalhes": detalhes,
+                    "usuario_id": row.get("usuario_id"),
+                    "usuario_nome": row.get("usuario_nome") or "",
                 }
             )
         return out
@@ -713,11 +930,15 @@ def row_to_item(row: Any) -> dict:
     return {field: (data.get(field) or "" if field in keys else "") for field in ITEM_FIELDS}
 
 
-def list_itens(conn: _ConnProxy | None = None) -> list[dict]:
+def list_itens(
+    conn: _ConnProxy | None = None, projeto_id: str = CASA_TRABALHADOR_ID
+) -> list[dict]:
     if conn is None:
         with connect() as c:
-            return list_itens(c)
-    rows = conn.execute("SELECT * FROM itens ORDER BY lower(id)").fetchall()
+            return list_itens(c, projeto_id)
+    rows = conn.execute(
+        "SELECT * FROM itens WHERE projeto_id=? ORDER BY lower(id)", (projeto_id,)
+    ).fetchall()
     return [row_to_item(r) for r in rows]
 
 
@@ -731,6 +952,8 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
     values = {k: (item.get(k) or "") for k in ITEM_FIELDS}
     if not values.get("data_mudanca") and values.get("inicio"):
         values["data_mudanca"] = values["inicio"]
+    if not values.get("projeto_id"):
+        values["projeto_id"] = CASA_TRABALHADOR_ID
     values["atualizado_em"] = now or datetime.now().isoformat(timespec="seconds")
     params = (
         values["id"],
@@ -750,16 +973,19 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         values["foto"],
         values["bloco"],
         values["bloco_label"],
+        values["projeto_id"],
         values["atualizado_em"],
     )
     conn.execute(
         """
         INSERT INTO itens (
             id, frente, entrega, inicio, data_mudanca, nup, responsavel, parceiros,
-            prioridade, prazo, status, pct, proxima, obs, foto, bloco, bloco_label, atualizado_em
+            prioridade, prazo, status, pct, proxima, obs, foto, bloco, bloco_label,
+            projeto_id, atualizado_em
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?
         )
         ON CONFLICT(id) DO UPDATE SET
             frente=excluded.frente,
@@ -789,19 +1015,22 @@ def replace_all_itens(
     *,
     fonte: str = "",
     preserve_edits: bool = False,
+    projeto_id: str = CASA_TRABALHADOR_ID,
 ) -> int:
     with connect() as conn:
         init_db(conn)
         existing_edits: dict[str, dict] = {}
         if preserve_edits:
-            for row in list_itens(conn):
+            for row in list_itens(conn, projeto_id):
                 existing_edits[row["id"]] = {
                     k: row.get(k, "") for k in EDITABLE_FIELDS
                 }
 
-        conn.execute("DELETE FROM itens")
+        # Escopo por projeto: nunca apaga itens de outros projetos.
+        conn.execute("DELETE FROM itens WHERE projeto_id=?", (projeto_id,))
         for item in itens:
             payload = dict(item)
+            payload["projeto_id"] = projeto_id
             if preserve_edits and payload.get("id") in existing_edits:
                 for key, value in existing_edits[payload["id"]].items():
                     if value not in (None, ""):
@@ -809,14 +1038,21 @@ def replace_all_itens(
             upsert_item(conn, payload, touch=True)
 
         now = datetime.now().isoformat(timespec="seconds")
-        set_meta(conn, "projeto", "Casa do Trabalhador")
-        set_meta(conn, "atualizado_em", now)
-        set_meta(conn, "fonte", fonte or banco_label())
-        set_meta(conn, "blocos", json.dumps(BLOCO_LABELS, ensure_ascii=False))
+        if projeto_id == CASA_TRABALHADOR_ID:
+            set_meta(conn, "projeto", "Casa do Trabalhador")
+            set_meta(conn, "atualizado_em", now)
+            set_meta(conn, "fonte", fonte or banco_label())
+            set_meta(conn, "blocos", json.dumps(BLOCO_LABELS, ensure_ascii=False))
+        else:
+            conn.execute(
+                "UPDATE projetos SET atualizado_em=? WHERE id=?", (now, projeto_id)
+            )
         return len(itens)
 
 
-def update_item_fields(item_id: str, updates: dict) -> dict | None:
+def update_item_fields(
+    item_id: str, updates: dict, *, usuario: dict | None = None
+) -> dict | None:
     allowed = {k: updates[k] for k in EDITABLE_FIELDS if k in updates}
     if not allowed:
         with connect() as conn:
@@ -855,7 +1091,13 @@ def update_item_fields(item_id: str, updates: dict) -> dict | None:
             f"UPDATE itens SET {sets}, atualizado_em=? WHERE id=?",
             values,
         )
-        set_meta(conn, "atualizado_em", now)
+        projeto_id = before.get("projeto_id") or CASA_TRABALHADOR_ID
+        if projeto_id == CASA_TRABALHADOR_ID:
+            set_meta(conn, "atualizado_em", now)
+        else:
+            conn.execute(
+                "UPDATE projetos SET atualizado_em=? WHERE id=?", (now, projeto_id)
+            )
 
         parts = []
         for key, delta in changes.items():
@@ -876,6 +1118,7 @@ def update_item_fields(item_id: str, updates: dict) -> dict | None:
         if not parts:
             parts.append("Ação atualizada")
         tipo = "providencia" if "proxima" in changes else "atualizacao"
+        autor_id, autor_nome = _autor_from_usuario(usuario)
         add_historico(
             conn,
             item_id,
@@ -883,16 +1126,32 @@ def update_item_fields(item_id: str, updates: dict) -> dict | None:
             resumo="; ".join(parts),
             detalhes=changes,
             criado_em=now,
+            usuario_id=autor_id,
+            usuario_nome=autor_nome,
+        )
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="item",
+            entidade_id=item_id,
+            acao="atualizar",
+            usuario=usuario,
+            detalhes=changes,
+            conn=conn,
         )
         return get_item(conn, item_id)
 
 
-def create_item(payload: dict) -> dict:
+def create_item(
+    payload: dict,
+    *,
+    projeto_id: str = CASA_TRABALHADOR_ID,
+    usuario: dict | None = None,
+) -> dict:
     with connect() as conn:
         init_db(conn)
-        item_id = (payload.get("id") or "").strip() or next_item_id(conn)
+        item_id = (payload.get("id") or "").strip() or next_item_id(conn, projeto_id)
         if get_item(conn, item_id):
-            item_id = next_item_id(conn)
+            item_id = next_item_id(conn, projeto_id)
 
         frente = (payload.get("frente") or "").strip()
         bloco, bloco_label = bloco_from_frente(frente)
@@ -915,13 +1174,20 @@ def create_item(payload: dict) -> dict:
             "foto": (payload.get("foto") or "").strip(),
             "bloco": bloco,
             "bloco_label": bloco_label,
+            "projeto_id": projeto_id,
         }
         if not item["entrega"]:
             raise ValueError("Informe a entrega/ação")
 
         upsert_item(conn, item, touch=True)
         now = datetime.now().isoformat(timespec="seconds")
-        set_meta(conn, "atualizado_em", now)
+        if projeto_id == CASA_TRABALHADOR_ID:
+            set_meta(conn, "atualizado_em", now)
+        else:
+            conn.execute(
+                "UPDATE projetos SET atualizado_em=? WHERE id=?", (now, projeto_id)
+            )
+        autor_id, autor_nome = _autor_from_usuario(usuario)
         add_historico(
             conn,
             item_id,
@@ -929,6 +1195,17 @@ def create_item(payload: dict) -> dict:
             resumo=f"Ação criada: {item['entrega']}",
             detalhes={"entrega": {"de": "", "para": item["entrega"]}},
             criado_em=now,
+            usuario_id=autor_id,
+            usuario_nome=autor_nome,
+        )
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="item",
+            entidade_id=item_id,
+            acao="criar",
+            usuario=usuario,
+            detalhes={"entrega": item["entrega"]},
+            conn=conn,
         )
         return get_item(conn, item_id)
 
@@ -946,36 +1223,62 @@ def delete_historico(item_id: str, historico_id: int) -> bool:
         return True
 
 
-def delete_item(item_id: str) -> bool:
+def delete_item(item_id: str, *, usuario: dict | None = None) -> bool:
     with connect() as conn:
         init_db(conn)
         row = conn.execute(
-            "SELECT foto FROM itens WHERE id=?", (item_id,)
+            "SELECT foto, projeto_id FROM itens WHERE id=?", (item_id,)
         ).fetchone()
         if not row:
             return False
         if row["foto"]:
             delete_foto_file(row["foto"])
+        projeto_id = row.get("projeto_id") or CASA_TRABALHADOR_ID
         conn.execute("DELETE FROM historico WHERE item_id=?", (item_id,))
         conn.execute("DELETE FROM itens WHERE id=?", (item_id,))
-        set_meta(conn, "atualizado_em", datetime.now().isoformat(timespec="seconds"))
+        now = datetime.now().isoformat(timespec="seconds")
+        if projeto_id == CASA_TRABALHADOR_ID:
+            set_meta(conn, "atualizado_em", now)
+        else:
+            conn.execute(
+                "UPDATE projetos SET atualizado_em=? WHERE id=?", (now, projeto_id)
+            )
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="item",
+            entidade_id=item_id,
+            acao="excluir",
+            usuario=usuario,
+            conn=conn,
+        )
         return True
 
 
-def load_painel() -> dict:
+def load_painel(projeto_id: str = CASA_TRABALHADOR_ID) -> dict:
     ensure_db()
     with connect() as conn:
         init_db(conn)
-        itens = list_itens(conn)
-        blocos_raw = get_meta(conn, "blocos", "")
-        try:
-            blocos = json.loads(blocos_raw) if blocos_raw else BLOCO_LABELS
-        except json.JSONDecodeError:
-            blocos = BLOCO_LABELS
+        itens = list_itens(conn, projeto_id)
+        if projeto_id == CASA_TRABALHADOR_ID:
+            blocos_raw = get_meta(conn, "blocos", "")
+            try:
+                blocos = json.loads(blocos_raw) if blocos_raw else BLOCO_LABELS
+            except json.JSONDecodeError:
+                blocos = BLOCO_LABELS
+            nome_projeto = get_meta(conn, "projeto", "Casa do Trabalhador")
+            atualizado_em = get_meta(conn, "atualizado_em", "")
+            fonte = get_meta(conn, "fonte", banco_label())
+        else:
+            projeto = get_projeto(conn, projeto_id) or {}
+            blocos = (projeto.get("config") or {}).get("blocos", {})
+            nome_projeto = projeto.get("nome", projeto_id)
+            atualizado_em = projeto.get("atualizado_em", "")
+            fonte = banco_label()
         return {
-            "projeto": get_meta(conn, "projeto", "Casa do Trabalhador"),
-            "atualizado_em": get_meta(conn, "atualizado_em", ""),
-            "fonte": get_meta(conn, "fonte", banco_label()),
+            "projeto": nome_projeto,
+            "projeto_id": projeto_id,
+            "atualizado_em": atualizado_em,
+            "fonte": fonte,
             "blocos": blocos,
             "itens": itens,
         }
@@ -1296,6 +1599,368 @@ def destroy_session(token: str | None) -> None:
     with connect() as conn:
         init_db(conn)
         conn.execute("DELETE FROM sessoes WHERE token=?", (token,))
+
+
+# --- Projetos (portfólio) -----------------------------------------------
+
+
+def _slugify(value: str) -> str:
+    value = (value or "").strip().lower()
+    value = re.sub(r"[àáâãäå]", "a", value)
+    value = re.sub(r"[èéêë]", "e", value)
+    value = re.sub(r"[ìíîï]", "i", value)
+    value = re.sub(r"[òóôõö]", "o", value)
+    value = re.sub(r"[ùúûü]", "u", value)
+    value = value.replace("ç", "c")
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    return value.strip("-") or "projeto"
+
+
+def _projeto_public(row: Any) -> dict:
+    data = dict(row)
+    data["ativo"] = bool(data.get("ativo", 0))
+    try:
+        data["config"] = json.loads(data.get("config_json") or "{}")
+    except json.JSONDecodeError:
+        data["config"] = {}
+    data.pop("config_json", None)
+    return data
+
+
+def list_projetos(*, somente_ativos: bool = False) -> list[dict]:
+    with connect() as conn:
+        init_db(conn)
+        sql = """
+            SELECT p.*, u.usuario AS gerente_usuario, u.nome AS gerente_nome
+            FROM projetos p
+            LEFT JOIN usuarios u ON u.id = p.gerente_usuario_id
+        """
+        if somente_ativos:
+            sql += " WHERE p.ativo = 1"
+        sql += " ORDER BY lower(p.nome)"
+        rows = conn.execute(sql).fetchall()
+        return [_projeto_public(r) for r in rows]
+
+
+def get_projeto(conn: _ConnProxy, projeto_id: str) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT p.*, u.usuario AS gerente_usuario, u.nome AS gerente_nome
+        FROM projetos p
+        LEFT JOIN usuarios u ON u.id = p.gerente_usuario_id
+        WHERE p.id=?
+        """,
+        (projeto_id,),
+    ).fetchone()
+    return _projeto_public(row) if row else None
+
+
+def get_projeto_public(projeto_id: str) -> dict | None:
+    with connect() as conn:
+        init_db(conn)
+        return get_projeto(conn, projeto_id)
+
+
+def create_projeto(payload: dict, *, usuario: dict | None = None) -> dict:
+    nome = (payload.get("nome") or "").strip()
+    if not nome:
+        raise ValueError("Informe o nome do projeto")
+    config = payload.get("config") or {
+        "blocos": {},
+        "frente_to_bloco": {},
+        "status_options": DEFAULT_STATUS_OPTIONS,
+    }
+    now = datetime.now().isoformat(timespec="seconds")
+    with connect() as conn:
+        init_db(conn)
+        slug = _slugify(payload.get("id") or nome)
+        base_slug = slug
+        n = 2
+        while conn.execute("SELECT 1 FROM projetos WHERE id=?", (slug,)).fetchone():
+            slug = f"{base_slug}-{n}"
+            n += 1
+        gerente_id = payload.get("gerente_usuario_id") or None
+        conn.execute(
+            """
+            INSERT INTO projetos (
+                id, nome, descricao, gerente_usuario_id, prazo_conclusao,
+                config_json, ativo, criado_em, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+            """,
+            (
+                slug,
+                nome,
+                (payload.get("descricao") or "").strip(),
+                gerente_id,
+                (payload.get("prazo_conclusao") or "").strip(),
+                json.dumps(config, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+        if gerente_id:
+            _set_usuario_projeto(conn, int(gerente_id), slug, "admin")
+        add_audit(
+            projeto_id=slug,
+            entidade="projeto",
+            entidade_id=slug,
+            acao="criar",
+            usuario=usuario,
+            detalhes={"nome": nome},
+            conn=conn,
+        )
+        return get_projeto(conn, slug)
+
+
+def update_projeto(
+    projeto_id: str, updates: dict, *, usuario: dict | None = None
+) -> dict | None:
+    with connect() as conn:
+        init_db(conn)
+        before = get_projeto(conn, projeto_id)
+        if not before:
+            return None
+
+        fields: dict[str, object] = {}
+        if "nome" in updates:
+            fields["nome"] = str(updates["nome"] or "").strip()
+        if "descricao" in updates:
+            fields["descricao"] = str(updates["descricao"] or "").strip()
+        if "prazo_conclusao" in updates:
+            fields["prazo_conclusao"] = str(updates["prazo_conclusao"] or "").strip()
+        if "config" in updates:
+            fields["config_json"] = json.dumps(updates["config"] or {}, ensure_ascii=False)
+        if "ativo" in updates:
+            fields["ativo"] = 1 if updates["ativo"] else 0
+
+        gerente_novo = None
+        if "gerente_usuario_id" in updates:
+            gerente_novo = updates["gerente_usuario_id"] or None
+            fields["gerente_usuario_id"] = gerente_novo
+
+        if fields:
+            fields["atualizado_em"] = datetime.now().isoformat(timespec="seconds")
+            sets = ", ".join(f"{k}=?" for k in fields)
+            values = list(fields.values()) + [projeto_id]
+            conn.execute(f"UPDATE projetos SET {sets} WHERE id=?", values)
+
+        if "gerente_usuario_id" in updates and gerente_novo:
+            _set_usuario_projeto(conn, int(gerente_novo), projeto_id, "admin")
+
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="projeto",
+            entidade_id=projeto_id,
+            acao="atualizar",
+            usuario=usuario,
+            detalhes={k: v for k, v in fields.items() if k != "config_json"},
+            conn=conn,
+        )
+        return get_projeto(conn, projeto_id)
+
+
+def delete_projeto(projeto_id: str, *, usuario: dict | None = None) -> bool:
+    """Soft-delete: inativa o projeto, preservando itens e histórico."""
+    if projeto_id == CASA_TRABALHADOR_ID:
+        raise ValueError("O projeto Casa do Trabalhador não pode ser removido")
+    with connect() as conn:
+        init_db(conn)
+        before = get_projeto(conn, projeto_id)
+        if not before:
+            return False
+        conn.execute(
+            "UPDATE projetos SET ativo=0, atualizado_em=? WHERE id=?",
+            (datetime.now().isoformat(timespec="seconds"), projeto_id),
+        )
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="projeto",
+            entidade_id=projeto_id,
+            acao="excluir",
+            usuario=usuario,
+            conn=conn,
+        )
+        return True
+
+
+# --- Acessos por projeto -------------------------------------------------
+
+
+def _set_usuario_projeto(
+    conn: _ConnProxy, usuario_id: int, projeto_id: str, papel: str
+) -> None:
+    papel = normalize_papel(papel)
+    now = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO usuario_projetos (usuario_id, projeto_id, papel, criado_em, atualizado_em)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(usuario_id, projeto_id) DO UPDATE SET
+            papel=excluded.papel,
+            atualizado_em=excluded.atualizado_em
+        """,
+        (usuario_id, projeto_id, papel, now, now),
+    )
+
+
+def set_usuario_projeto(
+    usuario_id: int, projeto_id: str, papel: str, *, usuario: dict | None = None
+) -> None:
+    with connect() as conn:
+        init_db(conn)
+        if not get_usuario(conn, usuario_id):
+            raise ValueError("Usuário não encontrado")
+        if not get_projeto(conn, projeto_id):
+            raise ValueError("Projeto não encontrado")
+        _set_usuario_projeto(conn, usuario_id, projeto_id, papel)
+        add_audit(
+            projeto_id=projeto_id,
+            entidade="usuario",
+            entidade_id=str(usuario_id),
+            acao="conceder_acesso",
+            usuario=usuario,
+            detalhes={"papel": normalize_papel(papel)},
+            conn=conn,
+        )
+
+
+def remove_usuario_projeto(
+    usuario_id: int, projeto_id: str, *, usuario: dict | None = None
+) -> bool:
+    with connect() as conn:
+        init_db(conn)
+        cur = conn.execute(
+            "DELETE FROM usuario_projetos WHERE usuario_id=? AND projeto_id=?",
+            (usuario_id, projeto_id),
+        )
+        removido = cur.rowcount > 0
+        if removido:
+            add_audit(
+                projeto_id=projeto_id,
+                entidade="usuario",
+                entidade_id=str(usuario_id),
+                acao="revogar_acesso",
+                usuario=usuario,
+                conn=conn,
+            )
+        return removido
+
+
+def list_projetos_do_usuario(usuario_id: int) -> list[dict]:
+    with connect() as conn:
+        init_db(conn)
+        rows = conn.execute(
+            """
+            SELECT up.projeto_id, up.papel, p.nome, p.ativo
+            FROM usuario_projetos up
+            JOIN projetos p ON p.id = up.projeto_id
+            WHERE up.usuario_id = ?
+            ORDER BY lower(p.nome)
+            """,
+            (usuario_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_usuarios_do_projeto(projeto_id: str) -> list[dict]:
+    with connect() as conn:
+        init_db(conn)
+        rows = conn.execute(
+            """
+            SELECT up.usuario_id, up.papel, u.usuario, u.nome, u.ativo
+            FROM usuario_projetos up
+            JOIN usuarios u ON u.id = up.usuario_id
+            WHERE up.projeto_id = ?
+            ORDER BY lower(u.usuario)
+            """,
+            (projeto_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def papel_no_projeto(usuario: dict | None, projeto_id: str) -> str | None:
+    """Papel do usuário no projeto. Admin global é super-admin (acesso total)."""
+    if not usuario:
+        return None
+    if usuario.get("papel") == "admin":
+        return "admin"
+    with connect() as conn:
+        init_db(conn)
+        row = conn.execute(
+            "SELECT papel FROM usuario_projetos WHERE usuario_id=? AND projeto_id=?",
+            (usuario.get("id"), projeto_id),
+        ).fetchone()
+        return row["papel"] if row else None
+
+
+def pode_editar_projeto(usuario: dict | None, projeto_id: str) -> bool:
+    return papel_no_projeto(usuario, projeto_id) in ("admin", "editor")
+
+
+def pode_administrar_projeto(usuario: dict | None, projeto_id: str) -> bool:
+    return papel_no_projeto(usuario, projeto_id) == "admin"
+
+
+# --- Auditoria -------------------------------------------------------------
+
+
+def add_audit(
+    *,
+    projeto_id: str | None,
+    entidade: str,
+    acao: str,
+    usuario: dict | None,
+    entidade_id: str = "",
+    detalhes: dict | None = None,
+    conn: _ConnProxy | None = None,
+) -> None:
+    autor_id, autor_nome = _autor_from_usuario(usuario)
+    row = (
+        projeto_id,
+        entidade,
+        str(entidade_id or ""),
+        acao,
+        autor_id,
+        autor_nome,
+        datetime.now().isoformat(timespec="seconds"),
+        json.dumps(detalhes or {}, ensure_ascii=False, default=str),
+    )
+    sql = """
+        INSERT INTO audit_log (
+            projeto_id, entidade, entidade_id, acao, usuario_id, usuario_nome, criado_em, detalhes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    if conn is not None:
+        conn.execute(sql, row)
+        return
+    with connect() as c:
+        init_db(c)
+        c.execute(sql, row)
+
+
+def list_audit(*, projeto_id: str | None = None, limite: int = 200) -> list[dict]:
+    with connect() as conn:
+        init_db(conn)
+        if projeto_id:
+            rows = conn.execute(
+                "SELECT * FROM audit_log WHERE projeto_id=? "
+                "ORDER BY criado_em DESC, id DESC LIMIT ?",
+                (projeto_id, limite),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM audit_log ORDER BY criado_em DESC, id DESC LIMIT ?",
+                (limite,),
+            ).fetchall()
+        out = []
+        for row in rows:
+            data = dict(row)
+            try:
+                data["detalhes"] = json.loads(data.get("detalhes") or "{}")
+            except json.JSONDecodeError:
+                data["detalhes"] = {}
+            out.append(data)
+        return out
 
 
 def ensure_db() -> str:

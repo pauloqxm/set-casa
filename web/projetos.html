@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gerenciar Projetos · SET / IDT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+    <link rel="stylesheet" href="/static/css/portfolio.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Administração</p>
+              <h1>Gerenciar Projetos</h1>
+              <p class="topbar-meta">Criação, prazos, gerentes e permissões por projeto</p>
+            </div>
+          </div>
+          <div class="user-nav" id="userNav">
+            <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
+            <a class="btn-ghost btn-small" href="/admin.html">Usuários</a>
+            <button type="button" class="btn-ghost btn-small" id="btnSair">
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="wrap admin-wrap">
+        <section class="panel admin-panel">
+          <div class="panel-head">
+            <h2>Novo projeto</h2>
+            <p>O projeto entra automaticamente no portfólio. O gerente indicado vira administrador do projeto.</p>
+          </div>
+          <form id="projetoForm" class="admin-form">
+            <div class="admin-form-grid">
+              <label>
+                Nome do projeto
+                <input id="projNome" type="text" required autocomplete="off" />
+              </label>
+              <label>
+                Prazo de conclusão
+                <input id="projPrazo" type="date" />
+              </label>
+              <label>
+                Gerente do projeto
+                <select id="projGerente">
+                  <option value="">— Sem gerente definido —</option>
+                </select>
+              </label>
+              <label>
+                Descrição
+                <input id="projDescricao" type="text" autocomplete="off" />
+              </label>
+            </div>
+            <p class="login-error" id="projFormError" hidden></p>
+            <div class="dialog-actions-right admin-form-actions">
+              <button type="submit" class="btn-run">Criar projeto</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel admin-panel">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Projetos cadastrados</h2>
+              <p>Inclui o projeto legado Casa do Trabalhador</p>
+            </div>
+            <span class="tag" id="projCount">—</span>
+          </div>
+          <div class="table-scroll">
+            <table class="admin-table projetos-table">
+              <thead>
+                <tr>
+                  <th>Projeto</th>
+                  <th>Gerente</th>
+                  <th>Prazo</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="projetosBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="editProjetoDialog" class="dialog dialog-wide">
+      <form method="dialog" id="editProjetoForm">
+        <header>
+          <p class="eyebrow">Editar projeto</p>
+          <h3 id="editProjetoTitle">—</h3>
+        </header>
+        <input type="hidden" id="editProjetoId" />
+        <label>
+          Nome
+          <input id="editProjetoNome" type="text" required />
+        </label>
+        <label>
+          Descrição
+          <input id="editProjetoDescricao" type="text" />
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Prazo de conclusão
+            <input id="editProjetoPrazo" type="date" />
+          </label>
+          <label>
+            Gerente do projeto
+            <select id="editProjetoGerente">
+              <option value="">— Sem gerente definido —</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Status
+          <select id="editProjetoAtivo">
+            <option value="1">Ativo</option>
+            <option value="0">Inativo (arquivado)</option>
+          </select>
+        </label>
+        <p class="login-error" id="editProjetoError" hidden></p>
+
+        <div class="dialog-section">
+          <h4>Acessos ao projeto</h4>
+          <div class="access-list" id="accessList"></div>
+          <div class="access-add-row">
+            <select id="accessUserSelect"></select>
+            <select id="accessPapelSelect">
+              <option value="consulta">Consulta</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Administrador</option>
+            </select>
+            <button type="button" class="btn-run btn-small" id="btnConcederAcesso">
+              Conceder
+            </button>
+          </div>
+        </div>
+
+        <div class="dialog-section">
+          <h4>Auditoria recente</h4>
+          <div class="audit-list" id="auditList">
+            <p class="muted">Carregando…</p>
+          </div>
+        </div>
+
+        <div class="dialog-actions">
+          <button type="button" class="btn-danger btn-danger-solid" id="editProjetoDelete">
+            Arquivar projeto
+          </button>
+          <div class="dialog-actions-right">
+            <button type="button" class="btn-ghost" id="editProjetoCancel">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-run">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/js/projetos.js"></script>
+  </body>
+</html>

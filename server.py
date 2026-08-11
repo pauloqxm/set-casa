@@ -84,7 +84,7 @@ def pct_number(value) -> float | None:
         return None
 
 
-def compute_kpis(itens: list[dict]) -> dict:
+def compute_kpis(itens: list[dict], *, prazo_conclusao: date | None = None) -> dict:
     today = date.today()
     total = len(itens)
     concluidos = sum(1 for i in itens if is_done(i.get("status", "")))
@@ -115,7 +115,7 @@ def compute_kpis(itens: list[dict]) -> dict:
     nao_iniciados = sum(
         1 for i in itens if (i.get("status") or "").casefold() == "não iniciado"
     )
-    return {
+    base = {
         "total": total,
         "concluidos": concluidos,
         "progresso_pct": progresso,
@@ -125,9 +125,16 @@ def compute_kpis(itens: list[dict]) -> dict:
         "em_andamento": em_andamento,
         "nao_iniciados": nao_iniciados,
         "hoje": today.isoformat(),
-        "inauguracao": INAUGURACAO.isoformat(),
-        "dias_para_inauguracao": (INAUGURACAO - today).days,
     }
+    if prazo_conclusao is not None:
+        base["prazo_conclusao"] = prazo_conclusao.isoformat()
+        base["dias_para_conclusao"] = (prazo_conclusao - today).days
+    else:
+        # Compatibilidade: painel legado da Casa do Trabalhador sempre expôs
+        # estes dois campos com o nome "inauguração".
+        base["inauguracao"] = INAUGURACAO.isoformat()
+        base["dias_para_inauguracao"] = (INAUGURACAO - today).days
+    return base
 
 
 def compute_frentes(itens: list[dict]) -> list[dict]:
@@ -220,18 +227,51 @@ def attention_items(itens: list[dict]) -> list[dict]:
     return selected[:20]
 
 
-def painel_response() -> dict:
-    painel = db.load_painel()
+def _kpis_for_projeto(projeto_id: str, raw_itens: list[dict]) -> dict:
+    if projeto_id == db.CASA_TRABALHADOR_ID:
+        return compute_kpis(raw_itens)
+    projeto = db.get_projeto_public(projeto_id) or {}
+    return compute_kpis(
+        raw_itens, prazo_conclusao=parse_date(projeto.get("prazo_conclusao", ""))
+    )
+
+
+def painel_response(projeto_id: str = db.CASA_TRABALHADOR_ID) -> dict:
+    painel = db.load_painel(projeto_id)
     raw_itens = painel.get("itens", [])
     itens = annotate_items(raw_itens)
+    kpis = _kpis_for_projeto(projeto_id, raw_itens)
     return {
         **painel,
         "itens": itens,
-        "kpis": compute_kpis(raw_itens),
+        "kpis": kpis,
         "frentes": compute_frentes(raw_itens),
         "atencao": attention_items(itens),
         "banco": db.banco_label(),
     }
+
+
+def portfolio_response(user: dict) -> dict:
+    projetos = db.list_projetos(somente_ativos=True)
+    out = []
+    for p in projetos:
+        papel = db.papel_no_projeto(user, p["id"])
+        if not papel:
+            continue
+        raw_itens = db.list_itens(projeto_id=p["id"])
+        kpis = _kpis_for_projeto(p["id"], raw_itens)
+        out.append(
+            {
+                "id": p["id"],
+                "nome": p["nome"],
+                "descricao": p.get("descricao", ""),
+                "gerente_nome": p.get("gerente_nome") or p.get("gerente_usuario") or "",
+                "prazo_conclusao": p.get("prazo_conclusao", ""),
+                "papel": papel,
+                "kpis": kpis,
+            }
+        )
+    return {"ok": True, "projetos": out}
 
 
 def is_public_path(path: str) -> bool:
@@ -345,6 +385,23 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         return user
 
+    _PAPEL_RANK = {"consulta": 0, "editor": 1, "admin": 2}
+
+    def _require_projeto_role(self, projeto_id: str, minimo: str = "consulta") -> dict | None:
+        """Exige que o usuário logado tenha ao menos `minimo` de acesso ao projeto.
+        Administradores globais sempre têm acesso total (super-admin)."""
+        user = self._require_user()
+        if not user:
+            return None
+        if not db.get_projeto_public(projeto_id):
+            self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+            return None
+        papel = db.papel_no_projeto(user, projeto_id)
+        if not papel or self._PAPEL_RANK.get(papel, -1) < self._PAPEL_RANK.get(minimo, 0):
+            self._send_json({"ok": False, "erro": "Sem permissão para este projeto"}, 403)
+            return None
+        return user
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -376,7 +433,12 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if not is_public_path(path):
-            if path.startswith("/admin") or path == "/admin.html":
+            if (
+                path.startswith("/admin")
+                or path == "/admin.html"
+                or path in ("/projetos", "/projetos.html")
+                or path.startswith("/projetos/")
+            ):
                 user = self._require_admin()
             else:
                 user = self._require_user()
@@ -385,6 +447,80 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path == "/api/painel":
             self._send_json(painel_response())
+            return
+
+        if path == "/api/portfolio":
+            user = self._current_user()
+            self._send_json(portfolio_response(user))
+            return
+
+        if path == "/api/projetos":
+            if not self._require_admin():
+                return
+            self._send_json({"ok": True, "projetos": db.list_projetos()})
+            return
+
+        proj_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
+        if proj_match:
+            projeto_id = proj_match.group(1)
+            if not self._require_projeto_role(projeto_id, "admin"):
+                return
+            projeto = db.get_projeto_public(projeto_id)
+            if not projeto:
+                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "projeto": projeto})
+            return
+
+        proj_painel_match = re.fullmatch(r"/api/projetos/([^/]+)/painel", path)
+        if proj_painel_match:
+            projeto_id = proj_painel_match.group(1)
+            if not self._require_projeto_role(projeto_id, "consulta"):
+                return
+            self._send_json(painel_response(projeto_id))
+            return
+
+        proj_hist_match = re.fullmatch(
+            r"/api/projetos/([^/]+)/itens/([^/]+)/historico", path
+        )
+        if proj_hist_match:
+            projeto_id, item_id = proj_hist_match.groups()
+            if not self._require_projeto_role(projeto_id, "consulta"):
+                return
+            with db.connect() as conn:
+                db.init_db(conn)
+                item = db.get_item(conn, item_id)
+            if not item or item.get("projeto_id") != projeto_id:
+                self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "item_id": item_id,
+                    "entrega": item.get("entrega", ""),
+                    "historico": db.list_historico(item_id),
+                }
+            )
+            return
+
+        proj_usuarios_match = re.fullmatch(r"/api/projetos/([^/]+)/usuarios", path)
+        if proj_usuarios_match:
+            projeto_id = proj_usuarios_match.group(1)
+            if not self._require_projeto_role(projeto_id, "admin"):
+                return
+            self._send_json(
+                {"ok": True, "usuarios": db.list_usuarios_do_projeto(projeto_id)}
+            )
+            return
+
+        proj_audit_match = re.fullmatch(r"/api/projetos/([^/]+)/auditoria", path)
+        if proj_audit_match:
+            projeto_id = proj_audit_match.group(1)
+            if not self._require_projeto_role(projeto_id, "admin"):
+                return
+            self._send_json(
+                {"ok": True, "auditoria": db.list_audit(projeto_id=projeto_id)}
+            )
             return
 
         foto_match = re.fullmatch(r"/api/fotos/(.+)", path)
@@ -437,6 +573,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/index.html"
         elif path in ("/admin", "/admin.html"):
             self.path = "/admin.html"
+        elif path in ("/portfolio", "/portfolio.html"):
+            self.path = "/portfolio.html"
+        elif path in ("/projetos", "/projetos.html"):
+            self.path = "/projetos.html"
+        elif re.fullmatch(r"/projeto/[^/]+/?", path):
+            projeto_id_pagina = path.strip("/").split("/")[1]
+            if not self._require_projeto_role(projeto_id_pagina, "consulta"):
+                return
+            self.path = "/painel.html"
         elif path == "/login.html" and self._current_user():
             self.send_response(302)
             self.send_header("Location", "/")
@@ -470,6 +615,31 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "usuario": updated})
             return
 
+        proj_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
+        if proj_match:
+            projeto_id = proj_match.group(1)
+            if not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            updated = db.update_projeto(projeto_id, body, usuario=self._current_user())
+            if not updated:
+                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "projeto": updated})
+            return
+
+        proj_item_match = re.fullmatch(r"/api/projetos/([^/]+)/itens/([^/]+)", path)
+        if proj_item_match:
+            projeto_id, item_id = proj_item_match.groups()
+            user = self._require_projeto_role(projeto_id, "editor")
+            if not user:
+                return
+            return self._patch_item(projeto_id, item_id, user)
+
         if not self._require_editor():
             return
 
@@ -478,6 +648,9 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": False, "erro": "Rota não encontrada"}, 404)
             return
         item_id = match.group(1)
+        self._patch_item(db.CASA_TRABALHADOR_ID, item_id, self._current_user())
+
+    def _patch_item(self, projeto_id: str, item_id: str, user: dict | None) -> None:
         try:
             body = self._read_json()
         except json.JSONDecodeError:
@@ -487,7 +660,7 @@ class Handler(SimpleHTTPRequestHandler):
         with db.connect() as conn:
             db.init_db(conn)
             current = db.get_item(conn, item_id)
-        if not current:
+        if not current or current.get("projeto_id") != projeto_id:
             self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
             return
 
@@ -497,18 +670,18 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": False, "erro": str(exc)}, 400)
             return
 
-        found = db.update_item_fields(item_id, body)
+        found = db.update_item_fields(item_id, body, usuario=user)
         if not found:
             self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
             return
 
-        painel = db.load_painel()
+        painel = db.load_painel(projeto_id)
         found = annotate_items([found])[0]
         self._send_json(
             {
                 "ok": True,
                 "item": found,
-                "kpis": compute_kpis(painel.get("itens", [])),
+                "kpis": _kpis_for_projeto(projeto_id, painel.get("itens", [])),
                 "frentes": compute_frentes(painel.get("itens", [])),
                 "atualizado_em": painel.get("atualizado_em"),
                 "banco": db.banco_label(),
@@ -541,6 +714,88 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "removido": user_id})
             return
 
+        proj_del_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
+        if proj_del_match:
+            projeto_id = proj_del_match.group(1)
+            admin = self._require_admin()
+            if not admin:
+                return
+            try:
+                if not db.delete_projeto(projeto_id, usuario=admin):
+                    self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                    return
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "removido": projeto_id})
+            return
+
+        proj_usuario_del_match = re.fullmatch(
+            r"/api/projetos/([^/]+)/usuarios/(\d+)", path
+        )
+        if proj_usuario_del_match:
+            projeto_id, usuario_id_s = proj_usuario_del_match.groups()
+            user = self._require_projeto_role(projeto_id, "admin")
+            if not user:
+                return
+            usuario_id = int(usuario_id_s)
+            if not db.remove_usuario_projeto(usuario_id, projeto_id, usuario=user):
+                self._send_json({"ok": False, "erro": "Vínculo não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "removido": usuario_id})
+            return
+
+        proj_hist_del_match = re.fullmatch(
+            r"/api/projetos/([^/]+)/itens/([^/]+)/historico/(\d+)", path
+        )
+        if proj_hist_del_match:
+            projeto_id, item_id, hist_id_s = proj_hist_del_match.groups()
+            if not self._require_projeto_role(projeto_id, "editor"):
+                return
+            with db.connect() as conn:
+                db.init_db(conn)
+                item = db.get_item(conn, item_id)
+            if not item or item.get("projeto_id") != projeto_id:
+                self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+                return
+            if not db.delete_historico(item_id, int(hist_id_s)):
+                self._send_json({"ok": False, "erro": "Evento não encontrado"}, 404)
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "item_id": item_id,
+                    "historico": db.list_historico(item_id),
+                    "atualizado_em": db.load_painel(projeto_id).get("atualizado_em"),
+                }
+            )
+            return
+
+        proj_item_del_match = re.fullmatch(r"/api/projetos/([^/]+)/itens/([^/]+)", path)
+        if proj_item_del_match:
+            projeto_id, item_id = proj_item_del_match.groups()
+            user = self._require_projeto_role(projeto_id, "editor")
+            if not user:
+                return
+            with db.connect() as conn:
+                db.init_db(conn)
+                item = db.get_item(conn, item_id)
+            if not item or item.get("projeto_id") != projeto_id:
+                self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
+                return
+            db.delete_item(item_id, usuario=user)
+            painel = db.load_painel(projeto_id)
+            self._send_json(
+                {
+                    "ok": True,
+                    "removido": item_id,
+                    "kpis": _kpis_for_projeto(projeto_id, painel.get("itens", [])),
+                    "frentes": compute_frentes(painel.get("itens", [])),
+                    "atualizado_em": painel.get("atualizado_em"),
+                }
+            )
+            return
+
         if not self._require_editor():
             return
 
@@ -568,7 +823,7 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": False, "erro": "Rota não encontrada"}, 404)
             return
         item_id = match.group(1)
-        if not db.delete_item(item_id):
+        if not db.delete_item(item_id, usuario=self._current_user()):
             self._send_json({"ok": False, "erro": "Item não encontrado"}, 404)
             return
         painel = db.load_painel()
@@ -635,6 +890,82 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "usuario": created}, status=201)
             return
 
+        if path == "/api/projetos":
+            if not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_projeto(body, usuario=self._current_user())
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "projeto": created}, status=201)
+            return
+
+        proj_itens_match = re.fullmatch(r"/api/projetos/([^/]+)/itens", path)
+        if proj_itens_match:
+            projeto_id = proj_itens_match.group(1)
+            user = self._require_projeto_role(projeto_id, "editor")
+            if not user:
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                with db.connect() as conn:
+                    db.init_db(conn)
+                    item_id = db.next_item_id(conn, projeto_id)
+                body = prepare_item_payload(body, item_id, "")
+                body["id"] = item_id
+                created = db.create_item(body, projeto_id=projeto_id, usuario=user)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            painel = db.load_painel(projeto_id)
+            created = annotate_items([created])[0]
+            self._send_json(
+                {
+                    "ok": True,
+                    "item": created,
+                    "kpis": _kpis_for_projeto(projeto_id, painel.get("itens", [])),
+                    "frentes": compute_frentes(painel.get("itens", [])),
+                    "atualizado_em": painel.get("atualizado_em"),
+                },
+                status=201,
+            )
+            return
+
+        proj_usuarios_post_match = re.fullmatch(r"/api/projetos/([^/]+)/usuarios", path)
+        if proj_usuarios_post_match:
+            projeto_id = proj_usuarios_post_match.group(1)
+            user = self._require_projeto_role(projeto_id, "admin")
+            if not user:
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                usuario_id = int(body.get("usuario_id"))
+                db.set_usuario_projeto(
+                    usuario_id, projeto_id, body.get("papel", "consulta"), usuario=user
+                )
+            except (TypeError, ValueError) as exc:
+                self._send_json({"ok": False, "erro": str(exc) or "Dados inválidos"}, 400)
+                return
+            self._send_json(
+                {"ok": True, "usuarios": db.list_usuarios_do_projeto(projeto_id)},
+                status=201,
+            )
+            return
+
         if not self._require_editor():
             return
 
@@ -650,7 +981,7 @@ class Handler(SimpleHTTPRequestHandler):
                     item_id = db.next_item_id(conn)
                 body = prepare_item_payload(body, item_id, "")
                 body["id"] = item_id
-                created = db.create_item(body)
+                created = db.create_item(body, usuario=self._current_user())
             except ValueError as exc:
                 self._send_json({"ok": False, "erro": str(exc)}, 400)
                 return

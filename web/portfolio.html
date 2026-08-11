@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Portfólio de Projetos · SET / IDT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+    <link rel="stylesheet" href="/static/css/portfolio.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Visão geral</p>
+              <h1>Portfólio de Projetos</h1>
+              <p class="topbar-meta">Acompanhamento consolidado de todos os projetos</p>
+            </div>
+          </div>
+          <div class="user-nav" id="userNav">
+            <span class="user-chip" id="userChip" hidden>—</span>
+            <a class="btn-ghost btn-small" id="linkProjetos" href="/projetos.html" hidden>
+              Gerenciar projetos
+            </a>
+            <a class="btn-ghost btn-small" id="linkAdmin" href="/admin.html" hidden>
+              Usuários
+            </a>
+            <button type="button" class="btn-ghost btn-small" id="btnSair">
+              Sair
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="wrap">
+        <section class="panel portfolio-intro">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Meus projetos</h2>
+              <p>Clique em um projeto para abrir o painel de acompanhamento</p>
+            </div>
+            <span class="tag" id="portfolioCount">—</span>
+          </div>
+          <div class="portfolio-grid" id="portfolioGrid">
+            <p class="portfolio-empty" id="portfolioEmpty" hidden>
+              Nenhum projeto disponível para o seu usuário.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-strip" aria-hidden="true">
+          <span class="strip-green"></span>
+          <span class="strip-blue"></span>
+          <span class="strip-orange"></span>
+        </div>
+        <p>Portfólio de projetos — SET / IDT</p>
+      </footer>
+    </div>
+
+    <script src="/static/js/portfolio.js"></script>
+  </body>
+</html>

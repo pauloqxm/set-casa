@@ -13,6 +13,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import Any, Iterator
 from urllib.parse import quote
 
@@ -31,6 +32,12 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://") :]
 
 USE_POSTGRES = bool(DATABASE_URL)
+
+# Pool reutiliza conexões TCP (bem mais rápido em Postgres remoto).
+_PG_POOL = None
+_PG_POOL_LOCK = Lock()
+_SCHEMA_READY = False
+_SCHEMA_LOCK = Lock()
 
 BLOCO_LABELS = {
     "reforma": "Reforma",
@@ -273,22 +280,44 @@ def _split_sql_statements(script: str) -> list[str]:
     return parts
 
 
+def _get_pg_pool():
+    """Lazy singleton do ConnectionPool (thread-safe)."""
+    global _PG_POOL
+    if _PG_POOL is not None:
+        return _PG_POOL
+    with _PG_POOL_LOCK:
+        if _PG_POOL is not None:
+            return _PG_POOL
+        from psycopg.rows import dict_row
+        from psycopg_pool import ConnectionPool
+
+        # min_size=1 evita cold handshake a cada request; max_size limitado
+        # para caber no free tier (limite típico ~60 conexões diretas).
+        _PG_POOL = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=8,
+            timeout=30,
+            kwargs={"row_factory": dict_row},
+            open=True,
+        )
+        return _PG_POOL
+
+
 @contextmanager
 def connect(db_path: Path | None = None) -> Iterator[_ConnProxy]:
     if USE_POSTGRES:
-        import psycopg
-        from psycopg.rows import dict_row
-
-        conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
-        proxy = _ConnProxy(conn, "postgres")
-        try:
-            yield proxy
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        pool = _get_pg_pool()
+        # pool.connection() devolve a conexão ao pool ao sair do with —
+        # não chamar close() manualmente.
+        with pool.connection() as conn:
+            proxy = _ConnProxy(conn, "postgres")
+            try:
+                yield proxy
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
         return
 
     path = db_path or DB_PATH
@@ -308,7 +337,19 @@ def connect(db_path: Path | None = None) -> Iterator[_ConnProxy]:
 
 def banco_label() -> str:
     if USE_POSTGRES:
-        return "supabase-postgres"
+        # Detecta host para distinguir Supabase vs Railway no healthcheck.
+        host = ""
+        try:
+            from urllib.parse import urlparse
+
+            host = (urlparse(DATABASE_URL).hostname or "").lower()
+        except Exception:
+            host = ""
+        if "supabase" in host:
+            return "supabase-postgres"
+        if "railway" in host or "rlwy" in host:
+            return "railway-postgres"
+        return "postgres"
     return DB_PATH.name
 
 
@@ -679,16 +720,24 @@ CREATE INDEX IF NOT EXISTS idx_audit_projeto ON audit_log(projeto_id, criado_em)
 
 
 def init_db(conn: _ConnProxy) -> None:
-    if conn.dialect == "postgres":
-        conn.executescript(SCHEMA_POSTGRES)
-    else:
-        conn.executescript(SCHEMA_SQLITE)
-    _ensure_columns(conn)
-    _seed_historico_inicial(conn)
-    _migrate_papeis(conn)
-    _seed_admin_inicial(conn)
-    _seed_projeto_casa_trabalhador(conn)
-    _seed_usuario_projetos_inicial(conn)
+    """Cria/migra schema. Após a 1ª vez bem-sucedida, vira no-op (cache em memória)."""
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
+    with _SCHEMA_LOCK:
+        if _SCHEMA_READY:
+            return
+        if conn.dialect == "postgres":
+            conn.executescript(SCHEMA_POSTGRES)
+        else:
+            conn.executescript(SCHEMA_SQLITE)
+        _ensure_columns(conn)
+        _seed_historico_inicial(conn)
+        _migrate_papeis(conn)
+        _seed_admin_inicial(conn)
+        _seed_projeto_casa_trabalhador(conn)
+        _seed_usuario_projetos_inicial(conn)
+        _SCHEMA_READY = True
 
 
 def _ensure_columns(conn: _ConnProxy) -> None:
@@ -1630,16 +1679,68 @@ def _projeto_public(row: Any) -> dict:
 def list_projetos(*, somente_ativos: bool = False) -> list[dict]:
     with connect() as conn:
         init_db(conn)
-        sql = """
-            SELECT p.*, u.usuario AS gerente_usuario, u.nome AS gerente_nome
-            FROM projetos p
-            LEFT JOIN usuarios u ON u.id = p.gerente_usuario_id
-        """
-        if somente_ativos:
-            sql += " WHERE p.ativo = 1"
-        sql += " ORDER BY lower(p.nome)"
-        rows = conn.execute(sql).fetchall()
-        return [_projeto_public(r) for r in rows]
+        return _list_projetos(conn, somente_ativos=somente_ativos)
+
+
+def _list_projetos(conn: _ConnProxy, *, somente_ativos: bool = False) -> list[dict]:
+    sql = """
+        SELECT p.*, u.usuario AS gerente_usuario, u.nome AS gerente_nome
+        FROM projetos p
+        LEFT JOIN usuarios u ON u.id = p.gerente_usuario_id
+    """
+    if somente_ativos:
+        sql += " WHERE p.ativo = 1"
+    sql += " ORDER BY lower(p.nome)"
+    rows = conn.execute(sql).fetchall()
+    return [_projeto_public(r) for r in rows]
+
+
+def portfolio_for_usuario(usuario: dict) -> list[dict]:
+    """Retorna projetos acessíveis + itens em 1 conexão (evita N+1 do portfólio)."""
+    with connect() as conn:
+        init_db(conn)
+        projetos = _list_projetos(conn, somente_ativos=True)
+        if not projetos:
+            return []
+
+        if usuario.get("papel") == "admin":
+            papeis = {p["id"]: "admin" for p in projetos}
+        else:
+            rows = conn.execute(
+                "SELECT projeto_id, papel FROM usuario_projetos WHERE usuario_id=?",
+                (usuario.get("id"),),
+            ).fetchall()
+            papeis = {r["projeto_id"]: r["papel"] for r in rows}
+
+        acessiveis = [p for p in projetos if p["id"] in papeis]
+        if not acessiveis:
+            return []
+
+        ids = [p["id"] for p in acessiveis]
+        placeholders = ",".join("?" for _ in ids)
+        item_rows = conn.execute(
+            f"SELECT * FROM itens WHERE projeto_id IN ({placeholders}) ORDER BY lower(id)",
+            tuple(ids),
+        ).fetchall()
+        by_proj: dict[str, list[dict]] = {pid: [] for pid in ids}
+        for row in item_rows:
+            item = row_to_item(row)
+            by_proj.setdefault(item.get("projeto_id") or "", []).append(item)
+
+        out = []
+        for p in acessiveis:
+            out.append(
+                {
+                    "id": p["id"],
+                    "nome": p["nome"],
+                    "descricao": p.get("descricao", ""),
+                    "gerente_nome": p.get("gerente_nome") or p.get("gerente_usuario") or "",
+                    "prazo_conclusao": p.get("prazo_conclusao", ""),
+                    "papel": papeis[p["id"]],
+                    "itens": by_proj.get(p["id"], []),
+                }
+            )
+        return out
 
 
 def get_projeto(conn: _ConnProxy, projeto_id: str) -> dict | None:

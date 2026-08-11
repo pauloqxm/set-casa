@@ -252,22 +252,19 @@ def painel_response(projeto_id: str = db.CASA_TRABALHADOR_ID) -> dict:
 
 
 def portfolio_response(user: dict) -> dict:
-    projetos = db.list_projetos(somente_ativos=True)
+    rows = db.portfolio_for_usuario(user)
     out = []
-    for p in projetos:
-        papel = db.papel_no_projeto(user, p["id"])
-        if not papel:
-            continue
-        raw_itens = db.list_itens(projeto_id=p["id"])
+    for p in rows:
+        raw_itens = p.get("itens") or []
         kpis = _kpis_for_projeto(p["id"], raw_itens)
         out.append(
             {
                 "id": p["id"],
                 "nome": p["nome"],
                 "descricao": p.get("descricao", ""),
-                "gerente_nome": p.get("gerente_nome") or p.get("gerente_usuario") or "",
+                "gerente_nome": p.get("gerente_nome") or "",
                 "prazo_conclusao": p.get("prazo_conclusao", ""),
-                "papel": papel,
+                "papel": p.get("papel"),
                 "kpis": kpis,
             }
         )
@@ -393,10 +390,20 @@ class Handler(SimpleHTTPRequestHandler):
         user = self._require_user()
         if not user:
             return None
-        if not db.get_projeto_public(projeto_id):
-            self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
-            return None
-        papel = db.papel_no_projeto(user, projeto_id)
+        # Uma única conexão: existência do projeto + papel do usuário
+        with db.connect() as conn:
+            db.init_db(conn)
+            if not db.get_projeto(conn, projeto_id):
+                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                return None
+            if user.get("papel") == "admin":
+                papel = "admin"
+            else:
+                row = conn.execute(
+                    "SELECT papel FROM usuario_projetos WHERE usuario_id=? AND projeto_id=?",
+                    (user.get("id"), projeto_id),
+                ).fetchone()
+                papel = row["papel"] if row else None
         if not papel or self._PAPEL_RANK.get(papel, -1) < self._PAPEL_RANK.get(minimo, 0):
             self._send_json({"ok": False, "erro": "Sem permissão para este projeto"}, 403)
             return None

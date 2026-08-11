@@ -45,6 +45,9 @@
           </div>
           <div class="user-nav" id="userNav">
             <span class="user-chip" id="userChip" hidden>—</span>
+            <button type="button" class="btn-ghost btn-small" id="btnVoltar">
+              ← Voltar
+            </button>
             <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
             <button type="button" class="btn-ghost btn-small" id="btnSair">
               Sair
@@ -54,6 +57,18 @@
       </header>
 
       <main class="wrap">
+        <section class="panel projeto-meta-panel">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Dados do projeto</h2>
+              <p id="projMetaLine">Gerente: — · Prazo: —</p>
+            </div>
+            <button type="button" class="btn-run btn-small" id="btnEditarProjeto" hidden>
+              Editar título / gerente
+            </button>
+          </div>
+        </section>
+
         <section class="kpis" id="kpis" aria-label="Indicadores"></section>
 
         <section class="panel" aria-labelledby="frentesTitle">
@@ -107,6 +122,40 @@
         <p>Painel de projeto — SET / IDT</p>
       </footer>
     </div>
+
+    <dialog id="projDialog" class="dialog">
+      <form method="dialog" id="projForm">
+        <header>
+          <p class="eyebrow">Editar projeto</p>
+          <h3>Título, gerente e prazo</h3>
+        </header>
+        <label>
+          Título do projeto
+          <input id="projNome" type="text" required />
+        </label>
+        <label>
+          Descrição
+          <input id="projDescricao" type="text" />
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Gerente do projeto
+            <select id="projGerente">
+              <option value="">— Sem gerente definido —</option>
+            </select>
+          </label>
+          <label>
+            Prazo de conclusão
+            <input id="projPrazo" type="date" />
+          </label>
+        </div>
+        <p class="login-error" id="projError" hidden></p>
+        <div class="dialog-actions-right">
+          <button type="button" class="btn-ghost" id="projCancel">Cancelar</button>
+          <button type="submit" class="btn-run">Salvar</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="editDialog" class="dialog">
       <form method="dialog" id="editForm">

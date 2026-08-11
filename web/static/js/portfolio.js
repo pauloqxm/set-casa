@@ -7,6 +7,7 @@
     grid: document.getElementById("portfolioGrid"),
     empty: document.getElementById("portfolioEmpty"),
     count: document.getElementById("portfolioCount"),
+    btnVoltar: document.getElementById("btnVoltar"),
   };
 
   function escapeHtml(value) {
@@ -131,6 +132,23 @@
     await fetch("/api/logout", { method: "POST" });
     location.replace("/login.html");
   });
+
+  if (el.btnVoltar) {
+    el.btnVoltar.addEventListener("click", () => {
+      if (window.history.length > 1 && document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          if (ref.origin === location.origin) {
+            history.back();
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      location.href = "/";
+    });
+  }
 
   loadMe()
     .then(loadPortfolio)

@@ -146,6 +146,7 @@
     userChip: document.getElementById("userChip"),
     linkAdmin: document.getElementById("linkAdmin"),
     btnSair: document.getElementById("btnSair"),
+    btnVoltar: document.getElementById("btnVoltar"),
     btnTopo: document.getElementById("btnTopo"),
   };
 
@@ -1467,6 +1468,22 @@
     el.btnSair.addEventListener("click", async () => {
       await fetch("/api/logout", { method: "POST" });
       location.replace("/login.html");
+    });
+  }
+  if (el.btnVoltar) {
+    el.btnVoltar.addEventListener("click", () => {
+      if (window.history.length > 1 && document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          if (ref.origin === location.origin) {
+            history.back();
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      location.href = "/portfolio.html";
     });
   }
   if (el.btnTopo) {

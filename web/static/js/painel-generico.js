@@ -15,13 +15,25 @@
     projTitle: document.getElementById("projTitle"),
     atualizadoEm: document.getElementById("atualizadoEm"),
     userChip: document.getElementById("userChip"),
+    btnVoltar: document.getElementById("btnVoltar"),
     btnSair: document.getElementById("btnSair"),
+    projMetaLine: document.getElementById("projMetaLine"),
+    btnEditarProjeto: document.getElementById("btnEditarProjeto"),
     kpis: document.getElementById("kpis"),
     blocksRow: document.getElementById("blocksRow"),
     resultCount: document.getElementById("resultCount"),
     btnNovaAcao: document.getElementById("btnNovaAcao"),
     tableBody: document.getElementById("tableBody"),
     btnTopo: document.getElementById("btnTopo"),
+
+    projDialog: document.getElementById("projDialog"),
+    projForm: document.getElementById("projForm"),
+    projNome: document.getElementById("projNome"),
+    projDescricao: document.getElementById("projDescricao"),
+    projGerente: document.getElementById("projGerente"),
+    projPrazo: document.getElementById("projPrazo"),
+    projError: document.getElementById("projError"),
+    projCancel: document.getElementById("projCancel"),
 
     dialog: document.getElementById("editDialog"),
     editForm: document.getElementById("editForm"),
@@ -43,7 +55,30 @@
     editExcluir: document.getElementById("editExcluir"),
   };
 
-  const state = { itens: [], kpis: {}, frentes: [] };
+  const state = {
+    itens: [],
+    kpis: {},
+    frentes: [],
+    projeto: {},
+    usuario: null,
+    podeEditarProjeto: false,
+    usuarios: [],
+  };
+
+  function goBack(fallback = "/portfolio.html") {
+    if (window.history.length > 1 && document.referrer) {
+      try {
+        const ref = new URL(document.referrer);
+        if (ref.origin === location.origin) {
+          history.back();
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    location.href = fallback;
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -107,9 +142,65 @@
       return;
     }
     const user = data.usuario;
+    state.usuario = user;
     el.userChip.hidden = false;
     const papel = user.papel_label || user.papel || "";
-    el.userChip.textContent = papel ? `${user.nome || user.usuario} · ${papel}` : user.nome || user.usuario;
+    el.userChip.textContent = papel
+      ? `${user.nome || user.usuario} · ${papel}`
+      : user.nome || user.usuario;
+    state.podeEditarProjeto = user.papel === "admin";
+    // Botão só aparece após o painel informar o papel no projeto (meu_papel)
+    if (el.btnEditarProjeto && state.podeEditarProjeto) {
+      el.btnEditarProjeto.hidden = false;
+    }
+  }
+
+  function renderMeta() {
+    if (!el.projMetaLine) return;
+    const p = state.projeto || {};
+    const gerente = p.gerente_nome || "não definido";
+    el.projMetaLine.textContent = `Gerente: ${gerente} · Prazo: ${fmtDate(p.prazo_conclusao)}`;
+    if (el.btnEditarProjeto && state.podeEditarProjeto) {
+      el.btnEditarProjeto.textContent = p.gerente_nome
+        ? "Editar título / gerente"
+        : "Atribuir gerente / editar título";
+    }
+  }
+
+  function fillGerenteSelect(selecionado) {
+    const options = ['<option value="">— Sem gerente definido —</option>'];
+    state.usuarios.forEach((u) => {
+      if (u.ativo === false) return;
+      options.push(
+        `<option value="${u.id}" ${String(u.id) === String(selecionado || "") ? "selected" : ""}>${escapeHtml(
+          u.nome || u.usuario
+        )}</option>`
+      );
+    });
+    el.projGerente.innerHTML = options.join("");
+  }
+
+  async function ensureUsuarios() {
+    if (state.usuarios.length) return;
+    const data = await api("/api/usuarios/opcoes");
+    state.usuarios = data.usuarios || [];
+  }
+
+  async function openProjetoDialog() {
+    if (!state.podeEditarProjeto) return;
+    try {
+      await ensureUsuarios();
+    } catch (err) {
+      alert(err.message || "Sem permissão para listar usuários");
+      return;
+    }
+    const p = state.projeto || {};
+    el.projNome.value = p.nome || el.projTitle.textContent || "";
+    el.projDescricao.value = p.descricao || "";
+    el.projPrazo.value = (p.prazo_conclusao || "").slice(0, 10);
+    fillGerenteSelect(p.gerente_usuario_id || "");
+    el.projError.hidden = true;
+    el.projDialog.showModal();
   }
 
   function renderKpis() {
@@ -194,9 +285,22 @@
     state.itens = data.itens || [];
     state.kpis = data.kpis || {};
     state.frentes = data.frentes || [];
+    state.projeto = {
+      id: data.projeto_id || projetoId,
+      nome: data.projeto || "",
+      descricao: data.descricao || "",
+      gerente_usuario_id: data.gerente_usuario_id,
+      gerente_nome: data.gerente_nome || "",
+      prazo_conclusao: data.prazo_conclusao || "",
+    };
+    if (data.meu_papel === "admin" || (state.usuario && state.usuario.papel === "admin")) {
+      state.podeEditarProjeto = true;
+      if (el.btnEditarProjeto) el.btnEditarProjeto.hidden = false;
+    }
     el.projTitle.textContent = data.projeto || "Painel do projeto";
     document.title = `${data.projeto || "Projeto"} · SET / IDT`;
     el.atualizadoEm.textContent = fmtDateTime(data.atualizado_em);
+    renderMeta();
     renderKpis();
     renderBlocks();
     renderTable();
@@ -228,6 +332,58 @@
   }
 
   el.btnNovaAcao.addEventListener("click", () => openDialog(null));
+
+  if (el.btnEditarProjeto) {
+    el.btnEditarProjeto.addEventListener("click", () => {
+      openProjetoDialog().catch((err) => alert(err.message || "Erro"));
+    });
+  }
+
+  if (el.projCancel) {
+    el.projCancel.addEventListener("click", () => el.projDialog.close());
+  }
+
+  if (el.projForm) {
+    el.projForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      el.projError.hidden = true;
+      try {
+        const data = await api(`/api/projetos/${encodeURIComponent(projetoId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            nome: el.projNome.value.trim(),
+            descricao: el.projDescricao.value.trim(),
+            prazo_conclusao: el.projPrazo.value || "",
+            gerente_usuario_id: el.projGerente.value
+              ? Number(el.projGerente.value)
+              : null,
+          }),
+        });
+        el.projDialog.close();
+        const p = data.projeto || {};
+        state.projeto = {
+          id: p.id || projetoId,
+          nome: p.nome || "",
+          descricao: p.descricao || "",
+          gerente_usuario_id: p.gerente_usuario_id,
+          gerente_nome: p.gerente_nome || p.gerente_usuario || "",
+          prazo_conclusao: p.prazo_conclusao || "",
+        };
+        el.projTitle.textContent = state.projeto.nome || "Painel do projeto";
+        document.title = `${state.projeto.nome || "Projeto"} · SET / IDT`;
+        renderMeta();
+        // Recarrega KPIs (prazo pode ter mudado)
+        await loadPainel();
+      } catch (err) {
+        el.projError.textContent = err.message || "Erro ao salvar projeto";
+        el.projError.hidden = false;
+      }
+    });
+  }
+
+  if (el.btnVoltar) {
+    el.btnVoltar.addEventListener("click", () => goBack("/portfolio.html"));
+  }
 
   el.tableBody.addEventListener("click", (event) => {
     const btn = event.target.closest("[data-edit-item]");

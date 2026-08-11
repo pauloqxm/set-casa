@@ -9,6 +9,7 @@
     projetosBody: document.getElementById("projetosBody"),
     projCount: document.getElementById("projCount"),
     btnSair: document.getElementById("btnSair"),
+    btnVoltar: document.getElementById("btnVoltar"),
 
     dialog: document.getElementById("editProjetoDialog"),
     editForm: document.getElementById("editProjetoForm"),
@@ -131,15 +132,17 @@
     el.projetosBody.innerHTML = projetos
       .map((p) => {
         const status = p.ativo ? "ativo" : "inativo";
+        const temGerente = !!(p.gerente_nome || p.gerente_usuario);
+        const btnLabel = temGerente ? "Editar" : "Atribuir gerente";
         return `
           <tr>
             <td class="col-nome"><strong>${escapeHtml(p.nome)}</strong><br><span class="muted">${escapeHtml(p.id)}</span></td>
-            <td>${escapeHtml(p.gerente_nome || p.gerente_usuario || "—")}</td>
+            <td>${temGerente ? escapeHtml(p.gerente_nome || p.gerente_usuario) : '<span class="muted">Não definido</span>'}</td>
             <td>${fmtDate(p.prazo_conclusao)}</td>
             <td><span class="badge-status ${status}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
             <td>
               <button type="button" class="btn-run btn-small" data-edit-projeto="${p.id}">
-                Editar
+                ${btnLabel}
               </button>
             </td>
           </tr>
@@ -350,6 +353,23 @@
     await fetch("/api/logout", { method: "POST" });
     location.replace("/login.html");
   });
+
+  if (el.btnVoltar) {
+    el.btnVoltar.addEventListener("click", () => {
+      if (window.history.length > 1 && document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          if (ref.origin === location.origin) {
+            history.back();
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      location.href = "/portfolio.html";
+    });
+  }
 
   loadMe()
     .then(() => Promise.all([loadUsuarios(), loadProjetos()]))

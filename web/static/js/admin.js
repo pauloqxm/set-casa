@@ -9,6 +9,7 @@
     usersBody: document.getElementById("usersBody"),
     userCount: document.getElementById("userCount"),
     btnSair: document.getElementById("btnSair"),
+    btnVoltar: document.getElementById("btnVoltar"),
     dialog: document.getElementById("editUserDialog"),
     editForm: document.getElementById("editUserForm"),
     editId: document.getElementById("editUserId"),
@@ -210,6 +211,23 @@
     await fetch("/api/logout", { method: "POST" });
     location.replace("/login.html");
   });
+
+  if (el.btnVoltar) {
+    el.btnVoltar.addEventListener("click", () => {
+      if (window.history.length > 1 && document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          if (ref.origin === location.origin) {
+            history.back();
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      location.href = "/portfolio.html";
+    });
+  }
 
   loadMe()
     .then(loadUsers)

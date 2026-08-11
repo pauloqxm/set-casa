@@ -241,6 +241,7 @@ def painel_response(projeto_id: str = db.CASA_TRABALHADOR_ID) -> dict:
     raw_itens = painel.get("itens", [])
     itens = annotate_items(raw_itens)
     kpis = _kpis_for_projeto(projeto_id, raw_itens)
+    projeto = db.get_projeto_public(projeto_id) or {}
     return {
         **painel,
         "itens": itens,
@@ -248,6 +249,10 @@ def painel_response(projeto_id: str = db.CASA_TRABALHADOR_ID) -> dict:
         "frentes": compute_frentes(raw_itens),
         "atencao": attention_items(itens),
         "banco": db.banco_label(),
+        "descricao": projeto.get("descricao", ""),
+        "gerente_usuario_id": projeto.get("gerente_usuario_id"),
+        "gerente_nome": projeto.get("gerente_nome") or projeto.get("gerente_usuario") or "",
+        "prazo_conclusao": projeto.get("prazo_conclusao", ""),
     }
 
 
@@ -482,9 +487,12 @@ class Handler(SimpleHTTPRequestHandler):
         proj_painel_match = re.fullmatch(r"/api/projetos/([^/]+)/painel", path)
         if proj_painel_match:
             projeto_id = proj_painel_match.group(1)
-            if not self._require_projeto_role(projeto_id, "consulta"):
+            user = self._require_projeto_role(projeto_id, "consulta")
+            if not user:
                 return
-            self._send_json(painel_response(projeto_id))
+            payload = painel_response(projeto_id)
+            payload["meu_papel"] = db.papel_no_projeto(user, projeto_id)
+            self._send_json(payload)
             return
 
         proj_hist_match = re.fullmatch(
@@ -557,6 +565,23 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "usuarios": db.list_usuarios()})
             return
 
+        if path == "/api/usuarios/opcoes":
+            # Lista enxuta para selects (gerente etc.) — qualquer usuário autenticado
+            if not self._require_user():
+                return
+            opcoes = [
+                {
+                    "id": u["id"],
+                    "nome": u.get("nome") or "",
+                    "usuario": u.get("usuario") or "",
+                    "ativo": bool(u.get("ativo", True)),
+                }
+                for u in db.list_usuarios()
+                if u.get("ativo", True)
+            ]
+            self._send_json({"ok": True, "usuarios": opcoes})
+            return
+
         hist_match = re.fullmatch(r"/api/itens/([^/]+)/historico", path)
         if hist_match:
             item_id = hist_match.group(1)
@@ -625,7 +650,8 @@ class Handler(SimpleHTTPRequestHandler):
         proj_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
         if proj_match:
             projeto_id = proj_match.group(1)
-            if not self._require_admin():
+            # Admin global ou admin do projeto podem editar nome/gerente/prazo
+            if not self._require_projeto_role(projeto_id, "admin"):
                 return
             try:
                 body = self._read_json()

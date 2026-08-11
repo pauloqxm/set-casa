@@ -1,4 +1,16 @@
-/* Portfólio de projetos e gestão de projetos — SET / IDT */
+.projeto-meta-panel {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+}
+
+.projeto-meta-panel .panel-head {
+  margin-bottom: 0;
+}
+
+.projeto-meta-panel p {
+  margin: 4px 0 0;
+}
+
 
 .portfolio-intro {
   padding: 18px 20px 22px;

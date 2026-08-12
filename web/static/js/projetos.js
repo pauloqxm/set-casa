@@ -134,6 +134,12 @@
         const status = p.ativo ? "ativo" : "inativo";
         const temGerente = !!(p.gerente_nome || p.gerente_usuario);
         const btnLabel = temGerente ? "Editar" : "Atribuir gerente";
+        const podeExcluir = p.id !== "casa-trabalhador" && p.ativo;
+        const excluirBtn = podeExcluir
+          ? `<button type="button" class="btn-danger btn-danger-solid btn-small" data-excluir-projeto="${escapeHtml(p.id)}" title="Excluir projeto">
+                Excluir
+              </button>`
+          : "";
         return `
           <tr>
             <td class="col-nome"><strong>${escapeHtml(p.nome)}</strong><br><span class="muted">${escapeHtml(p.id)}</span></td>
@@ -141,14 +147,43 @@
             <td>${fmtDate(p.prazo_conclusao)}</td>
             <td><span class="badge-status ${status}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
             <td>
-              <button type="button" class="btn-run btn-small" data-edit-projeto="${p.id}">
-                ${btnLabel}
-              </button>
+              <div class="table-actions">
+                <button type="button" class="btn-run btn-small" data-edit-projeto="${escapeHtml(p.id)}">
+                  ${btnLabel}
+                </button>
+                ${excluirBtn}
+              </div>
             </td>
           </tr>
         `;
       })
       .join("");
+  }
+
+  async function excluirProjeto(id, { fromDialog = false } = {}) {
+    if (!id || id === "casa-trabalhador") {
+      alert("O projeto Casa do Trabalhador não pode ser excluído.");
+      return;
+    }
+    if (
+      !confirm(
+        "Excluir este projeto?\n\nEle sai do portfólio ativo. Os itens e o histórico são preservados (arquivamento)."
+      )
+    ) {
+      return;
+    }
+    try {
+      await api(`/api/projetos/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (fromDialog) el.dialog.close();
+      await loadProjetos();
+    } catch (err) {
+      if (fromDialog) {
+        el.editError.textContent = err.message || "Erro ao excluir";
+        el.editError.hidden = false;
+      } else {
+        alert(err.message || "Erro ao excluir projeto");
+      }
+    }
   }
 
   function renderAcessos() {
@@ -254,6 +289,11 @@
   });
 
   el.projetosBody.addEventListener("click", (event) => {
+    const excluir = event.target.closest("[data-excluir-projeto]");
+    if (excluir) {
+      excluirProjeto(excluir.dataset.excluirProjeto);
+      return;
+    }
     const btn = event.target.closest("[data-edit-projeto]");
     if (!btn) return;
     openEdit(btn.dataset.editProjeto);
@@ -288,16 +328,8 @@
   el.editDelete.addEventListener("click", async () => {
     const id = el.editId.value;
     if (!id) return;
-    if (!confirm("Arquivar este projeto? Os itens e o histórico serão preservados.")) return;
     el.editError.hidden = true;
-    try {
-      await api(`/api/projetos/${encodeURIComponent(id)}`, { method: "DELETE" });
-      el.dialog.close();
-      await loadProjetos();
-    } catch (err) {
-      el.editError.textContent = err.message || "Erro ao arquivar";
-      el.editError.hidden = false;
-    }
+    await excluirProjeto(id, { fromDialog: true });
   });
 
   el.btnConcederAcesso.addEventListener("click", async () => {

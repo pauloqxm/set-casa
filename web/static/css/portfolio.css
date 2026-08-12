@@ -134,6 +134,13 @@
   color: var(--ink-soft);
 }
 
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .access-row {
   display: flex;
   align-items: center;

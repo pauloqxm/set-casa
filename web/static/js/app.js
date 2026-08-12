@@ -1,4 +1,34 @@
 (() => {
+  const pathMatch = location.pathname.match(/^\/projeto\/([^/]+)\/?$/);
+  const PROJETO_ID = pathMatch
+    ? decodeURIComponent(pathMatch[1])
+    : "casa-trabalhador";
+  const IS_LEGACY_HOME = !pathMatch;
+
+  function apiPainel() {
+    return IS_LEGACY_HOME
+      ? "/api/painel"
+      : `/api/projetos/${encodeURIComponent(PROJETO_ID)}/painel`;
+  }
+
+  function apiItens() {
+    return IS_LEGACY_HOME
+      ? "/api/itens"
+      : `/api/projetos/${encodeURIComponent(PROJETO_ID)}/itens`;
+  }
+
+  function apiItem(id) {
+    return `${apiItens()}/${encodeURIComponent(id)}`;
+  }
+
+  function apiHistorico(itemId) {
+    return `${apiItem(itemId)}/historico`;
+  }
+
+  function apiHistoricoEvento(itemId, histId) {
+    return `${apiHistorico(itemId)}/${encodeURIComponent(histId)}`;
+  }
+
   const BLOCOS = [
     { id: "todas", label: "Todas" },
     { id: "reforma", label: "Reforma" },
@@ -80,6 +110,8 @@
     expanded: {},
     historicoCache: {},
     user: null,
+    projetoMeta: {},
+    usuariosOpcoes: [],
   };
 
   const CARDS_PER_PAGE = 8;
@@ -148,6 +180,19 @@
     btnSair: document.getElementById("btnSair"),
     btnVoltar: document.getElementById("btnVoltar"),
     btnTopo: document.getElementById("btnTopo"),
+    projTitle: document.getElementById("projTitle"),
+    prazoLabel: document.getElementById("prazoLabel"),
+    prazoData: document.getElementById("prazoData"),
+    projMetaLine: document.getElementById("projMetaLine"),
+    btnEditarProjeto: document.getElementById("btnEditarProjeto"),
+    projDialog: document.getElementById("projDialog"),
+    projForm: document.getElementById("projForm"),
+    projNome: document.getElementById("projNome"),
+    projDescricao: document.getElementById("projDescricao"),
+    projGerente: document.getElementById("projGerente"),
+    projPrazo: document.getElementById("projPrazo"),
+    projError: document.getElementById("projError"),
+    projCancel: document.getElementById("projCancel"),
   };
 
   function fmtDate(iso) {
@@ -347,6 +392,7 @@
   }
 
   function renderRing() {
+    if (!el.ringProgress || !el.ringPct) return;
     const pct = Number(state.kpis.progresso_pct || 0);
     const r = 34;
     const circ = 2 * Math.PI * r;
@@ -357,7 +403,11 @@
     );
     el.ringPct.textContent = `${pct}%`;
 
-    const dias = state.kpis.dias_para_inauguracao;
+    const dias =
+      state.kpis.dias_para_conclusao !== undefined && !IS_LEGACY_HOME
+        ? state.kpis.dias_para_conclusao
+        : state.kpis.dias_para_inauguracao;
+    if (!el.diasInaug) return;
     if (dias == null) {
       el.diasInaug.textContent = "—";
     } else if (dias >= 0) {
@@ -703,10 +753,7 @@
 
   async function loadHistorico(itemId) {
     try {
-      const res = await fetch(
-        `/api/itens/${encodeURIComponent(itemId)}/historico`,
-        { cache: "no-store" }
-      );
+      const res = await fetch(apiHistorico(itemId), { cache: "no-store" });
       if (!res.ok) throw new Error("falha");
       const data = await res.json();
       state.historicoCache[itemId] = data.historico || [];
@@ -939,10 +986,28 @@
   }
 
   function fillFrenteSelect(selected) {
+    if (!el.editFrente) return;
+    if (el.editFrente.tagName === "INPUT") {
+      el.editFrente.value = selected || "";
+      const list = document.getElementById("frentesSugestoes");
+      if (list) {
+        const fromData = state.itens.map((i) => i.frente).filter(Boolean);
+        const frentes = [...new Set(fromData)].sort((a, b) =>
+          a.localeCompare(b, "pt-BR")
+        );
+        list.innerHTML = frentes
+          .map((f) => `<option value="${escapeAttr(f)}"></option>`)
+          .join("");
+      }
+      return;
+    }
     const fromData = state.itens.map((i) => i.frente).filter(Boolean);
-    const frentes = [...new Set([...FRENTES_PADRAO, ...fromData])].sort((a, b) =>
+    const base = IS_LEGACY_HOME ? FRENTES_PADRAO : [];
+    const frentes = [...new Set([...base, ...fromData])].sort((a, b) =>
       a.localeCompare(b, "pt-BR")
     );
+    if (selected && !frentes.includes(selected)) frentes.unshift(selected);
+    if (!frentes.length) frentes.push("Geral");
     el.editFrente.innerHTML = frentes
       .map(
         (f) =>
@@ -1091,7 +1156,7 @@
     el.editSubmit.textContent = "Incluir ação";
     el.editDelete.style.display = "none";
     if (el.editExcluir) el.editExcluir.style.display = "none";
-    fillFrenteSelect(FRENTES_PADRAO[0]);
+    fillFrenteSelect(IS_LEGACY_HOME ? FRENTES_PADRAO[0] : "");
     fillStatusSelect("Não iniciado");
     el.editEntrega.value = "";
     el.editResponsavel.value = "";
@@ -1118,9 +1183,13 @@
   }
 
   async function loadPainel() {
-    const res = await fetch("/api/painel", { cache: "no-store" });
+    const res = await fetch(apiPainel(), { cache: "no-store" });
     if (res.status === 401) {
       location.replace("/login.html");
+      return;
+    }
+    if (res.status === 403) {
+      location.replace("/portfolio.html");
       return;
     }
     if (!res.ok) throw new Error("Falha ao carregar painel");
@@ -1159,6 +1228,47 @@
     state.frentes = data.frentes || [];
     state.atencao = data.atencao || [];
     state.atualizadoEm = data.atualizado_em || "";
+    state.projetoMeta = {
+      id: data.projeto_id || PROJETO_ID,
+      nome: data.projeto || "",
+      descricao: data.descricao || "",
+      gerente_usuario_id: data.gerente_usuario_id,
+      gerente_nome: data.gerente_nome || "",
+      prazo_conclusao: data.prazo_conclusao || "",
+      meu_papel: data.meu_papel || "",
+    };
+    if (el.projTitle && state.projetoMeta.nome) {
+      el.projTitle.textContent = state.projetoMeta.nome;
+    }
+    if (!IS_LEGACY_HOME && state.projetoMeta.nome) {
+      document.title = `${state.projetoMeta.nome} · SET Projetos`;
+    }
+    if (el.prazoLabel) {
+      el.prazoLabel.textContent = IS_LEGACY_HOME ? "Inauguração" : "Prazo";
+    }
+    if (el.prazoData) {
+      const raw = IS_LEGACY_HOME
+        ? state.kpis.inauguracao || "2026-11-26"
+        : state.projetoMeta.prazo_conclusao || state.kpis.prazo_conclusao || "";
+      el.prazoData.textContent = fmtDate(raw);
+    }
+    if (el.projMetaLine) {
+      const g = state.projetoMeta.gerente_nome || "não definido";
+      el.projMetaLine.textContent = `Gerente: ${g} · Prazo: ${fmtDate(
+        state.projetoMeta.prazo_conclusao
+      )}`;
+    }
+    const podeEditarProj =
+      (state.user && state.user.papel === "admin") ||
+      state.projetoMeta.meu_papel === "admin";
+    if (el.btnEditarProjeto) {
+      el.btnEditarProjeto.hidden = !podeEditarProj || IS_LEGACY_HOME;
+      if (!el.btnEditarProjeto.hidden) {
+        el.btnEditarProjeto.textContent = state.projetoMeta.gerente_nome
+          ? "Editar título / gerente"
+          : "Atribuir gerente / editar título";
+      }
+    }
     renderFilters();
     renderAll();
   }
@@ -1178,7 +1288,7 @@
     ) {
       return;
     }
-    const res = await fetch(`/api/itens/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiItem(id), {
       method: "DELETE",
     });
     if (!res.ok) {
@@ -1214,7 +1324,7 @@
       alert(err.message || "Não foi possível preparar os dados.");
       return;
     }
-    const res = await fetch(`/api/itens/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiItem(id), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1232,10 +1342,9 @@
     if (!confirm("Excluir este evento da linha do tempo?")) {
       return;
     }
-    const res = await fetch(
-      `/api/itens/${encodeURIComponent(itemId)}/historico/${encodeURIComponent(histId)}`,
-      { method: "DELETE" }
-    );
+    const res = await fetch(apiHistoricoEvento(itemId, histId), {
+      method: "DELETE",
+    });
     if (!res.ok) {
       alert("Não foi possível excluir o evento.");
       return;
@@ -1262,7 +1371,7 @@
     }
 
     if (mode === "create") {
-      const res = await fetch("/api/itens", {
+      const res = await fetch(apiItens(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1282,7 +1391,7 @@
     }
 
     const id = el.editId.value;
-    const res = await fetch(`/api/itens/${encodeURIComponent(id)}`, {
+    const res = await fetch(apiItem(id), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1322,13 +1431,16 @@
     setBloco(state.bloco === bloco ? "todas" : bloco);
   });
 
-  document.querySelector(".view-toggle").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-view]");
-    if (!btn) return;
-    state.view = btn.dataset.view;
-    state.cardsPage = 1;
-    renderViews();
-  });
+  const viewToggle = document.querySelector(".view-toggle");
+  if (viewToggle) {
+    viewToggle.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-view]");
+      if (!btn) return;
+      state.view = btn.dataset.view;
+      state.cardsPage = 1;
+      renderViews();
+    });
+  }
 
   document.querySelectorAll("#mainTable thead th[data-key]").forEach((th) => {
     th.addEventListener("click", () => {
@@ -1492,11 +1604,86 @@
     });
   }
 
+  async function ensureUsuariosOpcoes() {
+    if (state.usuariosOpcoes && state.usuariosOpcoes.length) return;
+    const res = await fetch("/api/usuarios/opcoes", { cache: "no-store" });
+    if (!res.ok) throw new Error("Sem permissão para listar usuários");
+    const data = await res.json();
+    state.usuariosOpcoes = data.usuarios || [];
+  }
+
+  if (el.btnEditarProjeto && el.projDialog) {
+    el.btnEditarProjeto.addEventListener("click", async () => {
+      try {
+        await ensureUsuariosOpcoes();
+      } catch (err) {
+        alert(err.message || "Erro ao carregar usuários");
+        return;
+      }
+      const p = state.projetoMeta || {};
+      el.projNome.value = p.nome || "";
+      el.projDescricao.value = p.descricao || "";
+      el.projPrazo.value = (p.prazo_conclusao || "").slice(0, 10);
+      const opts = ['<option value="">— Sem gerente definido —</option>'];
+      state.usuariosOpcoes.forEach((u) => {
+        opts.push(
+          `<option value="${u.id}"${
+            String(u.id) === String(p.gerente_usuario_id || "") ? " selected" : ""
+          }>${escapeHtml(u.nome || u.usuario)}</option>`
+        );
+      });
+      el.projGerente.innerHTML = opts.join("");
+      if (el.projError) el.projError.hidden = true;
+      el.projDialog.showModal();
+    });
+  }
+
+  if (el.projCancel) {
+    el.projCancel.addEventListener("click", () => el.projDialog.close());
+  }
+
+  if (el.projForm) {
+    el.projForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (el.projError) el.projError.hidden = true;
+      try {
+        const res = await fetch(
+          `/api/projetos/${encodeURIComponent(PROJETO_ID)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: el.projNome.value.trim(),
+              descricao: el.projDescricao.value.trim(),
+              prazo_conclusao: el.projPrazo.value || "",
+              gerente_usuario_id: el.projGerente.value
+                ? Number(el.projGerente.value)
+                : null,
+            }),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.erro || "Erro ao salvar projeto");
+        el.projDialog.close();
+        await loadPainel();
+      } catch (err) {
+        if (el.projError) {
+          el.projError.textContent = err.message || "Erro ao salvar";
+          el.projError.hidden = false;
+        } else {
+          alert(err.message || "Erro ao salvar");
+        }
+      }
+    });
+  }
+
   loadSession()
     .then(() => loadPainel())
     .catch((err) => {
       console.error(err);
-      el.cards.innerHTML =
-        '<div class="empty">Erro ao carregar o painel. Verifique se o servidor está em execução.</div>';
+      if (el.cards) {
+        el.cards.innerHTML =
+          '<div class="empty">Erro ao carregar o painel. Verifique se o servidor está em execução.</div>';
+      }
     });
 })();

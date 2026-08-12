@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Painel de Projeto · SET / IDT</title>
+    <title>SET Projetos · Painel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -36,17 +36,61 @@
               />
             </div>
             <div class="topbar-titles">
-              <p class="eyebrow">SET / IDT · Acompanhamento gerencial</p>
+              <p class="eyebrow">SET Projetos · Acompanhamento gerencial</p>
               <h1 id="projTitle">Painel do projeto</h1>
               <p class="topbar-meta">
                 Atualizado: <span id="atualizadoEm">—</span>
+                · <span id="projMetaLine">Gerente: — · Prazo: —</span>
               </p>
+            </div>
+          </div>
+          <div class="top-progress">
+            <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+              <circle
+                cx="42"
+                cy="42"
+                r="34"
+                fill="none"
+                stroke="#e4e4e4"
+                stroke-width="8"
+              />
+              <circle
+                id="ringProgress"
+                cx="42"
+                cy="42"
+                r="34"
+                fill="none"
+                stroke="#39b54a"
+                stroke-width="8"
+                stroke-linecap="round"
+                transform="rotate(-90 42 42)"
+              />
+              <text
+                x="42"
+                y="40"
+                text-anchor="middle"
+                class="ring-num"
+                id="ringPct"
+              >
+                0%
+              </text>
+              <text x="42" y="54" text-anchor="middle" class="ring-label">
+                CONCLUÍDO
+              </text>
+            </svg>
+            <div class="inaug-meta">
+              <span class="eyebrow" id="prazoLabel">Prazo</span>
+              <strong id="prazoData">—</strong>
+              <span id="diasInaug">—</span>
             </div>
           </div>
           <div class="user-nav" id="userNav">
             <span class="user-chip" id="userChip" hidden>—</span>
             <button type="button" class="btn-ghost btn-small" id="btnVoltar">
               ← Voltar
+            </button>
+            <button type="button" class="btn-ghost btn-small" id="btnEditarProjeto" hidden>
+              Editar título / gerente
             </button>
             <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
             <button type="button" class="btn-ghost btn-small" id="btnSair">
@@ -57,18 +101,6 @@
       </header>
 
       <main class="wrap">
-        <section class="panel projeto-meta-panel">
-          <div class="panel-head panel-head-row">
-            <div>
-              <h2>Dados do projeto</h2>
-              <p id="projMetaLine">Gerente: — · Prazo: —</p>
-            </div>
-            <button type="button" class="btn-run btn-small" id="btnEditarProjeto" hidden>
-              Editar título / gerente
-            </button>
-          </div>
-        </section>
-
         <section class="kpis" id="kpis" aria-label="Indicadores"></section>
 
         <section class="panel" aria-labelledby="frentesTitle">
@@ -88,28 +120,81 @@
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-head panel-head-row">
-            <div>
-              <h2>Ações do projeto</h2>
-              <p id="resultCount"></p>
-            </div>
-            <button type="button" class="btn-run btn-small" id="btnNovaAcao">
-              Nova ação
-            </button>
+        <section class="attention panel" aria-labelledby="atencaoTitle">
+          <div class="panel-head">
+            <h2 id="atencaoTitle">Atenção do gerente</h2>
+            <p>Críticas, atrasadas e aguardando terceiros · com prazo em dias</p>
           </div>
+          <div class="attention-tabs" id="atencaoTabs" role="tablist" aria-label="Estágios de atenção"></div>
+          <div class="attention-list" id="atencaoList"></div>
+        </section>
+
+        <section class="controls panel">
+          <div class="tabs" id="tabs" role="tablist" aria-label="Blocos"></div>
+          <div class="filters">
+            <label>
+              Status
+              <select id="filterStatus"></select>
+            </label>
+            <label>
+              Prioridade
+              <select id="filterPrioridade"></select>
+            </label>
+            <label>
+              Responsável
+              <select id="filterResponsavel"></select>
+            </label>
+            <label class="filter-search">
+              Busca
+              <input
+                id="filterSearch"
+                type="search"
+                placeholder="Entrega, NUP, providência…"
+              />
+            </label>
+          </div>
+          <div class="view-row">
+            <p class="result-count" id="resultCount"></p>
+            <div class="view-actions">
+              <button type="button" class="btn-ghost btn-small" id="btnToggleConcluidos">
+                Exibir concluídos
+              </button>
+              <button type="button" class="btn-run btn-small" id="btnNovaAcao">
+                Nova ação
+              </button>
+              <div class="view-toggle" role="group" aria-label="Modo de visualização">
+                <button type="button" class="view-btn is-active" data-view="cards">
+                  Cards
+                </button>
+                <button type="button" class="view-btn" data-view="table">
+                  Tabela
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cards-section" aria-live="polite">
+          <div class="cards" id="cards"></div>
+          <nav class="cards-pager" id="cardsPager" hidden aria-label="Páginas de cards"></nav>
+        </section>
+
+        <section class="table-panel panel is-hidden" id="tablePanel">
           <div class="table-scroll">
-            <table class="admin-table" id="mainTable">
+            <table id="mainTable">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Frente</th>
-                  <th>Entrega / Ação</th>
-                  <th>Responsável</th>
-                  <th>Prioridade</th>
-                  <th>Prazo</th>
-                  <th>Status</th>
-                  <th>Próxima providência</th>
+                  <th data-key="id">ID</th>
+                  <th data-key="frente">Frente</th>
+                  <th data-key="entrega">Entrega / Ação</th>
+                  <th data-key="responsavel">Responsável</th>
+                  <th data-key="parceiros">Parceiros</th>
+                  <th data-key="prioridade">Prioridade</th>
+                  <th data-key="data_mudanca">Data mudança</th>
+                  <th data-key="prazo">Prazo</th>
+                  <th data-key="status">Status</th>
+                  <th data-key="proxima">Próxima providência</th>
+                  <th>Foto</th>
                   <th></th>
                 </tr>
               </thead>
@@ -126,7 +211,7 @@
           <span class="strip-orange"></span>
         </div>
         <button type="button" class="btn btn-ghost btn-topo" id="btnTopo">↑ Voltar ao topo</button>
-        <p>Painel de projeto — SET / IDT</p>
+        <p>SET Projetos — monitoramento de entregas e providências</p>
       </footer>
     </div>
 
@@ -171,25 +256,32 @@
           <h3 id="editTitle">—</h3>
         </header>
         <input type="hidden" id="editId" />
+        <input type="hidden" id="editMode" value="edit" />
 
         <label>
           Entrega / Ação
           <input id="editEntrega" type="text" required />
         </label>
+        <label>
+          Frente
+          <input id="editFrente" type="text" list="frentesSugestoes" placeholder="Ex.: Sensibilização" />
+          <datalist id="frentesSugestoes"></datalist>
+        </label>
         <div class="dialog-dates">
-          <label>
-            Frente
-            <input id="editFrente" type="text" placeholder="Ex.: Infraestrutura" />
-          </label>
           <label>
             Responsável
             <input id="editResponsavel" type="text" />
           </label>
+          <label>
+            Parceiros
+            <input id="editParceiros" type="text" />
+          </label>
         </div>
         <label>
-          Parceiros
-          <input id="editParceiros" type="text" />
+          NUP
+          <input id="editNup" type="text" />
         </label>
+
         <label>
           Status
           <select id="editStatus"></select>
@@ -226,8 +318,35 @@
           Observações
           <textarea id="editObs" rows="3"></textarea>
         </label>
+        <div class="foto-field">
+          <span class="foto-label">Foto da movimentação</span>
+          <p class="foto-hint" id="fotoHint">
+            Opcional · JPG, PNG, WEBP ou GIF · até 5 MB
+          </p>
+          <input
+            id="editFoto"
+            class="foto-input-native"
+            type="file"
+            accept="image/*"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <button type="button" class="btn-run btn-small" id="btnTirarFoto">
+            Tirar foto
+          </button>
+          <div class="foto-preview-wrap" id="fotoPreviewWrap" hidden>
+            <img id="fotoPreview" class="foto-preview" alt="Pré-visualização da foto" />
+            <label class="foto-remove-label">
+              <input id="editRemoverFoto" type="checkbox" />
+              Remover foto atual
+            </label>
+          </div>
+        </div>
         <div class="dialog-actions">
           <div class="dialog-actions-left">
+            <button type="button" class="btn-danger" id="editDelete">
+              Limpar providência
+            </button>
             <button type="button" class="btn-danger btn-danger-solid" id="editExcluir">
               Excluir ação
             </button>
@@ -240,6 +359,6 @@
       </form>
     </dialog>
 
-    <script src="/static/js/painel-generico.js"></script>
+    <script src="/static/js/app.js"></script>
   </body>
 </html>

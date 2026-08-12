@@ -1766,11 +1766,20 @@ def create_projeto(payload: dict, *, usuario: dict | None = None) -> dict:
     nome = (payload.get("nome") or "").strip()
     if not nome:
         raise ValueError("Informe o nome do projeto")
+    # Todo projeto novo herda o layout padrão do painel SET Projetos
+    # (mesmo acompanhamento visual da Casa do Trabalhador).
     config = payload.get("config") or {
-        "blocos": {},
+        "layout": "painel-set",
+        "blocos": dict(BLOCO_LABELS),
         "frente_to_bloco": {},
-        "status_options": DEFAULT_STATUS_OPTIONS,
+        "status_options": list(DEFAULT_STATUS_OPTIONS),
     }
+    if "layout" not in config:
+        config["layout"] = "painel-set"
+    if "status_options" not in config:
+        config["status_options"] = list(DEFAULT_STATUS_OPTIONS)
+    if "blocos" not in config:
+        config["blocos"] = dict(BLOCO_LABELS)
     now = datetime.now().isoformat(timespec="seconds")
     with connect() as conn:
         init_db(conn)

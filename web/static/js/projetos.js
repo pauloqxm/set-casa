@@ -232,7 +232,7 @@
     event.preventDefault();
     el.projFormError.hidden = true;
     try {
-      await api("/api/projetos", {
+      const created = await api("/api/projetos", {
         method: "POST",
         body: JSON.stringify({
           nome: el.projNome.value.trim(),
@@ -243,6 +243,10 @@
       });
       el.form.reset();
       await loadProjetos();
+      const novo = created.projeto;
+      if (novo && novo.id && confirm(`Projeto "${novo.nome}" criado com o layout padrão SET Projetos.\n\nAbrir o painel agora?`)) {
+        location.href = `/projeto/${encodeURIComponent(novo.id)}`;
+      }
     } catch (err) {
       el.projFormError.textContent = err.message || "Erro ao criar projeto";
       el.projFormError.hidden = false;

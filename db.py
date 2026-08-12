@@ -47,6 +47,9 @@ BLOCO_LABELS = {
     "inauguracao": "Inauguração",
     "parcerias": "Parcerias",
     "mudanca": "Mudança de unidade",
+    "patrimonio": "Patrimônio",
+    "financeiro": "Financeiro",
+    "ti": "TI / Operacional",
     "outras": "Outras",
 }
 
@@ -58,9 +61,9 @@ FRENTE_TO_BLOCO = {
     "Evento de Inauguração": "inauguracao",
     "Parcerias Institucionais": "parcerias",
     "Implantação dos Serviços": "mudanca",
-    "Gestão Patrimonial": "outras",
-    "Gestão Contratual e Financeira": "outras",
-    "Tecnologia e Infraestrutura Operacional": "outras",
+    "Gestão Patrimonial": "patrimonio",
+    "Gestão Contratual e Financeira": "financeiro",
+    "Tecnologia e Infraestrutura Operacional": "ti",
 }
 
 FRENTES_PADRAO = list(FRENTE_TO_BLOCO.keys())
@@ -976,7 +979,14 @@ def get_meta(conn: _ConnProxy, chave: str, default: str = "") -> str:
 def row_to_item(row: Any) -> dict:
     data = dict(row) if not isinstance(row, dict) else row
     keys = set(data.keys())
-    return {field: (data.get(field) or "" if field in keys else "") for field in ITEM_FIELDS}
+    item = {field: (data.get(field) or "" if field in keys else "") for field in ITEM_FIELDS}
+    # Recalcula bloco a partir da frente (bases antigas podem ter "outras" desatualizado).
+    frente = (item.get("frente") or "").strip()
+    if frente:
+        bloco, bloco_label = bloco_from_frente(frente)
+        item["bloco"] = bloco
+        item["bloco_label"] = bloco_label
+    return item
 
 
 def list_itens(

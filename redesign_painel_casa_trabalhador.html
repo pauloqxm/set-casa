@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Proposta de Redesign · Casa do Trabalhador</title>
+<style>
+  :root{
+    --verde: #1A4D2E;
+    --verde-claro: #2E7D4F;
+    --lima: #56C435;
+    --teal: #2EC4B6;
+    --laranja: #F47820;
+    --vermelho: #D64545;
+    --cinza-900: #1C2321;
+    --cinza-700: #4A5750;
+    --cinza-500: #7C8A82;
+    --cinza-200: #E4E9E6;
+    --cinza-100: #F3F6F4;
+    --branco: #FFFFFF;
+    --font-display: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+    --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family: var(--font-body);
+    background: var(--cinza-100);
+    color: var(--cinza-900);
+    padding: 32px 24px 80px;
+    line-height: 1.5;
+  }
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+
+  .intro{
+    background: var(--verde);
+    color: var(--branco);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 40px;
+  }
+  .intro h1{ font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .intro p{ color: rgba(255,255,255,0.85); font-size: 14px; max-width: 720px; }
+  .intro .tag{
+    display:inline-block; background: var(--lima); color: var(--verde);
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 100px; margin-bottom: 14px;
+  }
+
+  section{ margin-bottom: 48px; }
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 16px; }
+  .section-head h2{ font-size: 16px; font-weight: 700; color: var(--verde); }
+  .section-head span{ font-size: 12px; color: var(--cinza-500); }
+
+  .before-after{ display:grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items:start; }
+  @media (max-width: 900px){ .before-after{ grid-template-columns: 1fr; } }
+  .panel{ background: var(--branco); border-radius: 12px; padding: 18px; border: 1px solid var(--cinza-200); }
+  .panel-label{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+  .panel-label.before{ color: var(--vermelho); }
+  .panel-label.after{ color: var(--verde-claro); }
+
+  /* --- KPI mock: BEFORE (mixed) --- */
+  .kpi-row{ display:grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .kpi{ background: var(--cinza-100); border-radius: 8px; padding: 10px 8px; }
+  .kpi .n{ font-size: 20px; font-weight: 700; }
+  .kpi .l{ font-size: 9.5px; color: var(--cinza-500); text-transform: uppercase; letter-spacing: .02em; }
+  .kpi.crit{ background: #FBEAEA; }
+  .kpi.crit .n{ color: var(--vermelho); }
+
+  /* --- KPI mock: AFTER (separated) --- */
+  .kpi-group-label{ font-size: 10px; font-weight: 700; color: var(--cinza-500); text-transform: uppercase; letter-spacing: .05em; margin: 14px 0 8px; }
+  .kpi-group-label:first-child{ margin-top: 0; }
+  .kpi-row.status .kpi{ border-left: 3px solid var(--teal); }
+  .kpi-row.alert{ grid-template-columns: repeat(2, 1fr); }
+  .kpi-row.alert .kpi{ background: #FBEAEA; border-left: 3px solid var(--vermelho); }
+  .kpi-row.alert .kpi .n{ color: var(--vermelho); }
+
+  /* --- Frente card BEFORE --- */
+  .frente-card{ background: var(--cinza-100); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .frente-card .top{ display:flex; justify-content:space-between; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .frente-card .badge{
+    display:inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+    padding: 2px 7px; border-radius: 100px; margin-top: 4px; text-transform: uppercase;
+  }
+  .badge.generic{ background: #E9E4D8; color: #8A7B4E; }
+  .frente-card .count{ font-size: 11px; color: var(--cinza-500); margin-top: 6px; }
+
+  /* --- Frente card AFTER --- */
+  .badge.patrimonio{ background: #E4EEFB; color: #2A5B99; }
+  .badge.financeiro{ background: #E9F7EC; color: var(--verde-claro); }
+  .badge.ti{ background: #EFE7FB; color: #6B3FA0; }
+  .badge.naoclass{ background: var(--cinza-200); color: var(--cinza-700); }
+  .bar-track{ height: 6px; background: var(--cinza-200); border-radius: 100px; margin-top: 8px; overflow:hidden; display:flex; }
+  .bar-seg.done{ background: var(--verde-claro); }
+  .bar-seg.progress{ background: var(--teal); }
+  .bar-seg.terceiros{ background: var(--laranja); }
+  .bar-seg.pending{ background: var(--cinza-200); }
+
+  /* --- Attention card BEFORE --- */
+  .att-card{ background: var(--cinza-100); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .att-tag-mixed{
+    display:inline-block; background: var(--vermelho); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 4px; letter-spacing: .02em; margin-bottom: 6px;
+  }
+  .att-title{ font-size: 12.5px; font-weight: 600; }
+  .att-meta{ font-size: 11px; color: var(--cinza-500); margin-top: 4px; }
+
+  /* --- Attention card AFTER --- */
+  .att-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px; }
+  .pill{ font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 100px; letter-spacing: .02em; }
+  .pill.priority-critica{ background: var(--vermelho); color: #fff; }
+  .pill.status-atrasado{ background: #FBEAEA; color: var(--vermelho); border: 1px solid var(--vermelho); }
+  .pill.status-terceiros{ background: #FFF1E2; color: var(--laranja); border: 1px solid var(--laranja); }
+  .days-badge{ font-size: 10.5px; font-weight: 700; color: var(--vermelho); font-family: var(--font-mono); }
+
+  .why-box{
+    background: var(--branco); border-left: 3px solid var(--teal); border-radius: 0 8px 8px 0;
+    padding: 12px 16px; margin-top: 16px; font-size: 12.5px; color: var(--cinza-700);
+  }
+  .why-box b{ color: var(--verde); }
+
+  /* --- GANTT --- */
+  .gantt-wrap{ background: var(--branco); border-radius: 12px; border: 1px solid var(--cinza-200); padding: 20px; overflow-x: auto; }
+  .gantt-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+  .gantt-header h3{ font-size: 14px; color: var(--verde); }
+  .gantt-header .today-flag{ font-size: 11px; color: var(--cinza-500); }
+  .gantt-grid{ min-width: 760px; }
+  .gantt-months{
+    display:grid; grid-template-columns: 200px repeat(6, 1fr); font-size: 10.5px; color: var(--cinza-500);
+    border-bottom: 1px solid var(--cinza-200); padding-bottom: 6px; margin-bottom: 10px; font-weight:600;
+  }
+  .gantt-row{ display:grid; grid-template-columns: 200px repeat(6, 1fr); align-items:center; height: 34px; position:relative; }
+  .gantt-row .rowlabel{ font-size: 11.5px; font-weight: 600; display:flex; align-items:center; gap:6px; }
+  .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .gantt-track{ grid-column: 2 / -1; position: relative; height: 18px; background: var(--cinza-100); border-radius: 4px; }
+  .bar{ position:absolute; top:0; height:18px; border-radius: 4px; }
+  .today-line{
+    position:absolute; top: 26px; bottom: 0; left: calc(200px + 5.5/6 * (100% - 200px));
+    border-left: 2px dashed var(--vermelho); z-index: 5;
+  }
+  .today-label{ position:absolute; top: 4px; font-size: 9.5px; color: var(--vermelho); font-weight:700; transform: translateX(-90%); }
+  .legend{ display:flex; gap:16px; margin-top: 18px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size: 11px; color: var(--cinza-700); }
+  .legend-swatch{ width:12px; height:12px; border-radius:3px; }
+
+  .footer-note{ font-size: 12px; color: var(--cinza-500); text-align:center; margin-top: 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="intro">
+    <div class="tag">Proposta de redesign</div>
+    <h1>Casa do Trabalhador · Painel de Monitoramento</h1>
+    <p>Comparativo entre a versão atual e os ajustes sugeridos para separar prioridade de status, dar identidade própria às frentes genéricas, e adicionar uma visão de cronograma cruzando as 11 frentes com a data de inauguração.</p>
+  </div>
+
+  <!-- 1. KPIs -->
+  <section>
+    <div class="section-head">
+      <h2>1 · KPIs do topo — separar status de alerta</h2>
+      <span>Hoje os dois tipos de dado ficam na mesma fileira</span>
+    </div>
+    <div class="before-after">
+      <div class="panel">
+        <div class="panel-label before">Como está</div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="n">100</div><div class="l">Total</div></div>
+          <div class="kpi"><div class="n">29</div><div class="l">Concluídas</div></div>
+          <div class="kpi"><div class="n">24</div><div class="l">Andamento</div></div>
+          <div class="kpi"><div class="n">19</div><div class="l">Não iniciadas</div></div>
+          <div class="kpi crit"><div class="n">11/2</div><div class="l">Críticas/Atraso</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-label after">Sugestão</div>
+        <div class="kpi-group-label">Status do fluxo</div>
+        <div class="kpi-row status" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi"><div class="n">29</div><div class="l">Concluídas</div></div>
+          <div class="kpi"><div class="n">24</div><div class="l">Andamento</div></div>
+          <div class="kpi"><div class="n">9</div><div class="l">C/ Terceiros</div></div>
+          <div class="kpi"><div class="n">19</div><div class="l">Não iniciadas</div></div>
+        </div>
+        <div class="kpi-group-label">Pontos de atenção</div>
+        <div class="kpi-row alert">
+          <div class="kpi"><div class="n">11</div><div class="l">Prioridade crítica</div></div>
+          <div class="kpi"><div class="n">2</div><div class="l">Prazo vencido</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="why-box"><b>Por quê:</b> status (o que está acontecendo) e prioridade/prazo (o que precisa de atenção agora) são duas perguntas diferentes. Separar as fileiras evita que o olho do gestor some as duas coisas como se fossem um único total.</div>
+  </section>
+
+  <!-- 2. Frentes -->
+  <section>
+    <div class="section-head">
+      <h2>2 · Cards de frente — etiquetas próprias e barra de progresso visível</h2>
+      <span>4 das 11 frentes hoje usam a mesma etiqueta "OUTRAS"</span>
+    </div>
+    <div class="before-after">
+      <div class="panel">
+        <div class="panel-label before">Como está</div>
+        <div class="frente-card">
+          <div class="top"><span>Gestão Patrimonial</span><span>6/9</span></div>
+          <span class="badge generic">Outras</span>
+        </div>
+        <div class="frente-card">
+          <div class="top"><span>Tecnologia e Infraestrutura Operacional</span><span>0/9</span></div>
+          <span class="badge generic">Outras</span>
+        </div>
+        <div class="frente-card">
+          <div class="top"><span>Sem frente</span><span>0/2</span></div>
+          <span class="badge generic">Outras</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-label after">Sugestão</div>
+        <div class="frente-card">
+          <div class="top"><span>Gestão Patrimonial</span><span>6/9</span></div>
+          <span class="badge patrimonio">Patrimônio</span>
+          <div class="bar-track">
+            <div class="bar-seg done" style="width:67%"></div>
+            <div class="bar-seg pending" style="width:33%"></div>
+          </div>
+        </div>
+        <div class="frente-card">
+          <div class="top"><span>Tecnologia e Infraestrutura Operacional</span><span>0/9</span></div>
+          <span class="badge ti">TI / Operacional</span>
+          <div class="bar-track">
+            <div class="bar-seg progress" style="width:40%"></div>
+            <div class="bar-seg pending" style="width:60%"></div>
+          </div>
+        </div>
+        <div class="frente-card">
+          <div class="top"><span>Itens não classificados</span><span>0/2</span></div>
+          <span class="badge naoclass">Sem categoria</span>
+          <div class="count">Fora da grade de frentes principais</div>
+        </div>
+      </div>
+    </div>
+    <div class="why-box"><b>Por quê:</b> etiqueta só ajuda se diferencia. Cada frente ganha sua própria cor/nome, e a barra segmentada mostra em um golpe de vista quanto está concluído, em andamento, com terceiros ou pendente, sem precisar ler o número.</div>
+  </section>
+
+  <!-- 3. Cards de atenção -->
+  <section>
+    <div class="section-head">
+      <h2>3 · Cards de atenção do gerente — separar prioridade de status</h2>
+      <span>Hoje "CRÍTICA" e "ATRASADO" aparecem grudados num único selo</span>
+    </div>
+    <div class="before-after">
+      <div class="panel">
+        <div class="panel-label before">Como está</div>
+        <div class="att-card">
+          <div class="att-tag-mixed">CRÍTICA · ATRASADO</div>
+          <div class="att-title">Receber 4ª medição da KG Construções</div>
+          <div class="att-meta">#095 · Karol · Outras · 32 dia(s) atrasado</div>
+        </div>
+        <div class="att-card">
+          <div class="att-tag-mixed">CRÍTICA · TERCEIROS</div>
+          <div class="att-title">Envio de RRTs à SECULTFOR</div>
+          <div class="att-meta">#008 · Karol · Restauro · 2 dia(s) restantes</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-label after">Sugestão</div>
+        <div class="att-card">
+          <div class="att-head">
+            <span class="pill priority-critica">Crítica</span>
+            <span class="pill status-atrasado">Atrasado</span>
+          </div>
+          <div class="att-title">Receber 4ª medição da KG Construções</div>
+          <div class="att-meta">#095 · Karol · Outras &nbsp;·&nbsp; <span class="days-badge">32 dias atrasado</span></div>
+        </div>
+        <div class="att-card">
+          <div class="att-head">
+            <span class="pill priority-critica">Crítica</span>
+            <span class="pill status-terceiros">Aguardando terceiros</span>
+          </div>
+          <div class="att-title">Envio de RRTs à SECULTFOR</div>
+          <div class="att-meta">#008 · Karol · Restauro &nbsp;·&nbsp; <span class="days-badge" style="color:var(--laranja)">2 dias restantes</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="why-box"><b>Por quê:</b> prioridade tem cor fixa (crítica = sempre vermelho sólido), status muda de cor conforme a situação. Em reunião, o olho encontra primeiro o que é crítico e só depois lê por que está parado.</div>
+  </section>
+
+  <!-- 4. Gantt -->
+  <section>
+    <div class="section-head">
+      <h2>4 · Cronograma consolidado — visão que ainda não existe no painel</h2>
+      <span>Cruza as 11 frentes com a data de inauguração (26/11/2026)</span>
+    </div>
+    <div class="gantt-wrap">
+      <div class="gantt-header">
+        <h3>Frentes de trabalho · Jun a Nov 2026</h3>
+        <span class="today-flag">Marcador vermelho = hoje (12/08/2026) · Marcador verde = inauguração (26/11)</span>
+      </div>
+      <div class="gantt-grid">
+        <div class="gantt-months">
+          <div></div><div>Jun</div><div>Jul</div><div>Ago</div><div>Set</div><div>Out</div><div>Nov</div>
+        </div>
+
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:#2A5B99"></span>Infraestrutura</div>
+          <div class="gantt-track"><div class="bar" style="left:0%; width:75%; background:#2A5B99"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:var(--laranja)"></span>Restauro</div>
+          <div class="gantt-track"><div class="bar" style="left:8%; width:58%; background:var(--laranja)"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:var(--teal)"></span>Equip. e Mobiliário</div>
+          <div class="gantt-track"><div class="bar" style="left:16%; width:34%; background:var(--teal)"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:#6B3FA0"></span>Comunicação Institucional</div>
+          <div class="gantt-track"><div class="bar" style="left:50%; width:34%; background:#6B3FA0"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:var(--verde-claro)"></span>Parcerias Institucionais</div>
+          <div class="gantt-track"><div class="bar" style="left:0%; width:83%; background:var(--verde-claro)"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:#2A5B99"></span>Mudança de Unidade</div>
+          <div class="gantt-track"><div class="bar" style="left:66%; width:26%; background:#2A5B99"></div></div>
+        </div>
+        <div class="gantt-row">
+          <div class="rowlabel"><span class="dot" style="background:var(--vermelho)"></span>Evento de Inauguração</div>
+          <div class="gantt-track"><div class="bar" style="left:83%; width:17%; background:var(--vermelho)"></div></div>
+          <div class="today-line"></div>
+          <div class="today-label">hoje</div>
+        </div>
+
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#2A5B99"></div>Reforma</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--laranja)"></div>Restauro</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--teal)"></div>Aquisição</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#6B3FA0"></div>Comunicação</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--verde-claro)"></div>Parcerias</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--vermelho)"></div>Inauguração</div>
+      </div>
+    </div>
+    <div class="why-box"><b>Por quê:</b> com data de entrega fixa e frentes dependentes entre si (ex: Restauro precisa terminar antes de Mudança de Unidade, que precisa terminar antes do Evento de Inauguração), essa visão mostra o caminho crítico do projeto de um jeito que nenhum card individual mostra sozinho. As barras aqui são ilustrativas, cada frente precisaria de uma data de início e fim reais para virar funcional.</div>
+  </section>
+
+  <div class="footer-note">Mockup de proposta · Casa do Trabalhador · gerado a partir do painel atual em set-projetos.up.railway.app</div>
+
+</div>
+</body>
+</html>

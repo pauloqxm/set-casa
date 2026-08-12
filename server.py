@@ -173,11 +173,12 @@ def compute_frentes(itens: list[dict]) -> list[dict]:
         )
         rest = max(total - done - andamento - aguardando, 0)
         sample = rows[0]
+        bloco, bloco_label = db.bloco_from_frente(frente if frente != "Sem frente" else "")
         out.append(
             {
                 "frente": frente,
-                "bloco": sample.get("bloco", "outras"),
-                "bloco_label": sample.get("bloco_label", "Outras"),
+                "bloco": bloco or sample.get("bloco", "outras"),
+                "bloco_label": bloco_label or sample.get("bloco_label", "Outras"),
                 "total": total,
                 "concluidos": done,
                 "em_andamento": andamento,

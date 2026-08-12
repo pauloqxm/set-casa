@@ -38,6 +38,9 @@
     { id: "inauguracao", label: "Inauguração" },
     { id: "parcerias", label: "Parcerias" },
     { id: "mudanca", label: "Mudança" },
+    { id: "patrimonio", label: "Patrimônio" },
+    { id: "financeiro", label: "Financeiro" },
+    { id: "ti", label: "TI / Operacional" },
     { id: "outras", label: "Outras" },
   ];
 
@@ -193,6 +196,8 @@
     projPrazo: document.getElementById("projPrazo"),
     projError: document.getElementById("projError"),
     projCancel: document.getElementById("projCancel"),
+    ganttRoot: document.getElementById("ganttRoot"),
+    ganttNote: document.getElementById("ganttNote"),
   };
 
   function fmtDate(iso) {
@@ -329,7 +334,7 @@
     const q = state.search.trim().toLowerCase();
     return sortItems(
       state.itens.filter((item) => {
-        if (state.bloco !== "todas" && item.bloco !== state.bloco) return false;
+        if (state.bloco !== "todas" && resolveBloco(item) !== state.bloco) return false;
         if (state.status && item.status !== state.status) return false;
         if (
           !state.showConcluidos &&
@@ -420,8 +425,6 @@
   function renderKpis() {
     const k = state.kpis || {};
     const icons = {
-      total:
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2zm2 4v2h6V7H9zm0 4v2h6v-2H9z"/></svg>',
       check:
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.2 13.3 6-6-1.4-1.4-4.6 4.6-2.2-2.2-1.4 1.4 3.6 3.6z"/></svg>',
       gear:
@@ -433,67 +436,9 @@
       alert:
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 21h22L12 3zm0 6h2v5h-2V9zm0 7h2v2h-2v-2z"/></svg>',
     };
-    const cards = [
-      {
-        id: "total",
-        tone: "green",
-        icon: icons.total,
-        head: "Total",
-        value: k.total ?? "—",
-        text: "Ações e entregas monitoradas",
-        status: "Escopo ativo",
-      },
-      {
-        id: "concluidas",
-        tone: "green",
-        icon: icons.check,
-        head: "Concluídas",
-        value: k.concluidos ?? 0,
-        text: "Itens finalizados",
-        status: `Progresso ${k.progresso_pct ?? 0}%`,
-      },
-      {
-        id: "andamento",
-        tone: "blue",
-        icon: icons.gear,
-        head: "Andamento",
-        value: k.em_andamento ?? 0,
-        text: "Em execução agora",
-        status: "Status",
-      },
-      {
-        id: "terceiros",
-        tone: "teal",
-        icon: icons.people,
-        head: "Terceiros",
-        value: k.aguardando_terceiros ?? 0,
-        text: "Aguardando ação externa",
-        status: "Dependência",
-      },
-      {
-        id: "nao-iniciadas",
-        tone: "orange",
-        icon: icons.clock,
-        head: "Não iniciadas",
-        value: k.nao_iniciados ?? 0,
-        text: "Ainda sem início formal",
-        status: "Fila",
-      },
-      {
-        id: "criticas",
-        tone: "red",
-        icon: icons.alert,
-        head: "Críticas / Atraso",
-        value: `${k.criticas_abertas ?? 0} / ${k.atrasadas ?? 0}`,
-        text: "Críticas abertas e prazos vencidos",
-        status: "Atenção",
-      },
-    ];
 
-    el.kpis.dataset.count = String(cards.length);
-    el.kpis.innerHTML = cards
-      .map(
-        (c) => `
+    function cardHtml(c) {
+      return `
       <article class="kpi-card kpi-${c.tone}">
         <div class="kpi-top">
           <span class="kpi-icon">${c.icon}</span>
@@ -505,9 +450,115 @@
           <span>${c.status}</span>
           <i class="kpi-dot" aria-hidden="true"></i>
         </div>
-      </article>`
-      )
-      .join("");
+      </article>`;
+    }
+
+    const statusCards = [
+      {
+        tone: "green",
+        icon: icons.check,
+        head: "Concluídas",
+        value: k.concluidos ?? 0,
+        text: "Itens finalizados",
+        status: `Progresso ${k.progresso_pct ?? 0}%`,
+      },
+      {
+        tone: "blue",
+        icon: icons.gear,
+        head: "Andamento",
+        value: k.em_andamento ?? 0,
+        text: "Em execução agora",
+        status: "Status",
+      },
+      {
+        tone: "teal",
+        icon: icons.people,
+        head: "C/ Terceiros",
+        value: k.aguardando_terceiros ?? 0,
+        text: "Aguardando ação externa",
+        status: "Dependência",
+      },
+      {
+        tone: "orange",
+        icon: icons.clock,
+        head: "Não iniciadas",
+        value: k.nao_iniciados ?? 0,
+        text: "Ainda sem início formal",
+        status: "Fila",
+      },
+    ];
+
+    const alertCards = [
+      {
+        tone: "red",
+        icon: icons.alert,
+        head: "Prioridade crítica",
+        value: k.criticas_abertas ?? 0,
+        text: "Críticas ainda em aberto",
+        status: "Prioridade",
+      },
+      {
+        tone: "red",
+        icon: icons.alert,
+        head: "Prazo vencido",
+        value: k.atrasadas ?? 0,
+        text: "Ações com prazo ultrapassado",
+        status: "Prazo",
+      },
+    ];
+
+    el.kpis.innerHTML = `
+      <div class="kpi-groups">
+        <div class="kpi-group">
+          <p class="kpi-group-label">Status do fluxo</p>
+          <div class="kpis-row kpis-status">${statusCards.map(cardHtml).join("")}</div>
+        </div>
+        <div class="kpi-group">
+          <p class="kpi-group-label">Pontos de atenção</p>
+          <div class="kpis-row kpis-alert">${alertCards.map(cardHtml).join("")}</div>
+        </div>
+      </div>`;
+  }
+
+  const FRENTE_ETIQUETA = {
+    Infraestrutura: "Reforma",
+    "Restauro e Patrimônio Histórico": "Restauro",
+    "Equipamentos e Mobiliário": "Aquisição",
+    "Comunicação Institucional": "Comunicação",
+    "Evento de Inauguração": "Inauguração",
+    "Parcerias Institucionais": "Parcerias",
+    "Implantação dos Serviços": "Mudança de unidade",
+    "Gestão Patrimonial": "Patrimônio",
+    "Gestão Contratual e Financeira": "Financeiro",
+    "Tecnologia e Infraestrutura Operacional": "TI / Operacional",
+    "Sem frente": "Sem categoria",
+  };
+
+  const FRENTE_BLOCO_UI = {
+    Infraestrutura: "reforma",
+    "Restauro e Patrimônio Histórico": "restauro",
+    "Equipamentos e Mobiliário": "aquisicao",
+    "Comunicação Institucional": "comunicacao",
+    "Evento de Inauguração": "inauguracao",
+    "Parcerias Institucionais": "parcerias",
+    "Implantação dos Serviços": "mudanca",
+    "Gestão Patrimonial": "patrimonio",
+    "Gestão Contratual e Financeira": "financeiro",
+    "Tecnologia e Infraestrutura Operacional": "ti",
+  };
+
+  function frenteDisplayName(frente) {
+    if ((frente || "").trim() === "Sem frente") return "Itens não classificados";
+    return frente || "Sem frente";
+  }
+
+  function frenteEtiqueta(frente, fallback) {
+    return FRENTE_ETIQUETA[frente] || fallback || "Outras";
+  }
+
+  function resolveBloco(item) {
+    const frente = (item.frente || "").trim();
+    return FRENTE_BLOCO_UI[frente] || item.bloco || "outras";
   }
 
   const BLOCO_VISUAL = {
@@ -539,6 +590,18 @@
       tone: "blue",
       icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>',
     },
+    patrimonio: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 3 9v12h6v-7h6v7h6V9l-9-6z"/></svg>',
+    },
+    financeiro: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18v3H3V5zm0 5h18v9H3v-9zm3 2v2h4v-2H6zm7 0v2h5v-2h-5z"/></svg>',
+    },
+    ti: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5h16v11H4V5zm2 2v7h12V7H6zm3 12h6v2H9v-2z"/></svg>',
+    },
     outras: {
       tone: "green",
       icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>',
@@ -563,17 +626,24 @@
     }
     el.blocks.innerHTML = frentes
       .map((f) => {
-        const active = state.bloco === f.bloco ? " is-active" : "";
-        const visual = blocoVisual(f.bloco);
+        const blocoId = FRENTE_BLOCO_UI[f.frente] || f.bloco || "outras";
+        const active = state.bloco === blocoId ? " is-active" : "";
+        const visual = blocoVisual(blocoId);
         const doneCls = Number(f.concluidos) > 0 ? " has-progress" : "";
+        const nome = frenteDisplayName(f.frente);
+        const etiqueta = frenteEtiqueta(f.frente, f.bloco_label);
+        const extra =
+          (f.frente || "") === "Sem frente"
+            ? '<div class="block-hint">Fora da grade de frentes principais</div>'
+            : "";
         return `
-        <button type="button" class="block block-${visual.tone}${active}" data-bloco="${escapeAttr(f.bloco)}">
+        <button type="button" class="block block-${visual.tone}${active}" data-bloco="${escapeAttr(blocoId)}">
           <div class="block-top">
             <div class="block-heading">
               <span class="block-icon">${visual.icon}</span>
               <div class="block-titles">
-                <div class="block-name">${escapeHtml(f.frente)}</div>
-                <div class="block-alt">${escapeHtml(f.bloco_label || "")}</div>
+                <div class="block-name">${escapeHtml(nome)}</div>
+                <div class="block-alt">${escapeHtml(etiqueta)}</div>
               </div>
             </div>
             <div class="block-count">${f.total} itens</div>
@@ -610,6 +680,7 @@
             <span>Concluído</span>
             <b class="block-ratio${doneCls}"><span>${f.concluidos}</span>/${f.total}</b>
           </div>
+          ${extra}
         </button>`;
       })
       .join("");
@@ -668,30 +739,35 @@
     }
     el.atencao.innerHTML = items
       .map((item) => {
-        const chips = [];
+        const pills = [];
         if (isCritica(item))
-          chips.push('<span class="chip chip-orange">Crítica</span>');
+          pills.push('<span class="pill pill-priority">Crítica</span>');
         else if ((item.prioridade || "") === "Alta")
-          chips.push('<span class="chip chip-blue">Alta</span>');
+          pills.push('<span class="pill pill-priority-alta">Alta</span>');
         if (item.atrasado)
-          chips.push('<span class="chip chip-orange">Atrasado</span>');
+          pills.push('<span class="pill pill-status-atrasado">Atrasado</span>');
         if (isTerceiros(item))
-          chips.push('<span class="chip chip-orange">Terceiros</span>');
+          pills.push(
+            '<span class="pill pill-status-terceiros">Aguardando terceiros</span>'
+          );
         const days = daysLabel(item);
         const critClass = isCritica(item) ? " is-critica" : "";
         const open = !!state.expanded[item.id];
+        const daysHtml = days.text
+          ? `<span class="days-badge ${days.cls}">${escapeHtml(days.text)}</span>`
+          : "";
         return `
         <article class="attention-item${critClass}${open ? " is-open" : ""}" data-item-id="${escapeAttr(item.id)}">
-          <div>${chips.join(" ")}</div>
+          <div class="att-pills">${pills.join("") || '<span class="pill pill-neutral">Atenção</span>'}</div>
           <div class="attention-main">
             <strong>${escapeHtml(item.entrega || "Sem título")}</strong>
             <p>${escapeHtml(item.proxima || "Sem próxima providência registrada")}</p>
             ${fotoMarkup(item, "attention-foto")}
             <div class="meta">
-              #${escapeHtml(item.id)} · ${escapeHtml(item.responsavel || "Sem responsável")} · ${escapeHtml(item.bloco_label || item.frente || "")}
+              #${escapeHtml(item.id)} · ${escapeHtml(item.responsavel || "Sem responsável")} · ${escapeHtml(frenteEtiqueta(item.frente, item.bloco_label) || item.frente || "")}
+              ${daysHtml ? ` · ${daysHtml}` : ""}
             </div>
           </div>
-          ${days.text ? `<div class="days-label ${days.cls}">${escapeHtml(days.text)}</div>` : "<div></div>"}
           <button type="button" class="btn-expand${open ? " is-open" : ""}" data-expand="${escapeAttr(item.id)}" aria-expanded="${open}">
             ${open ? "Ocultar" : "Linha do tempo"}
           </button>
@@ -963,12 +1039,148 @@
     }
   }
 
+  function parseItemDate(value) {
+    if (!value) return null;
+    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const br = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (br) return new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+    return null;
+  }
+
+  function renderGantt() {
+    if (!el.ganttRoot) return;
+    const frentes = (state.frentes || []).filter(
+      (f) => (f.frente || "") !== "Sem frente"
+    );
+    if (!frentes.length) {
+      el.ganttRoot.innerHTML =
+        '<div class="empty">Sem frentes com dados para o cronograma.</div>';
+      if (el.ganttNote) el.ganttNote.hidden = true;
+      return;
+    }
+
+    const ranges = frentes.map((f) => {
+      const itens = state.itens.filter(
+        (i) => (i.frente || "Sem frente") === f.frente
+      );
+      let start = null;
+      let end = null;
+      itens.forEach((item) => {
+        const candidates = [
+          parseItemDate(item.inicio),
+          parseItemDate(item.data_mudanca),
+          parseItemDate(item.prazo),
+        ].filter(Boolean);
+        candidates.forEach((d) => {
+          if (!start || d < start) start = d;
+          if (!end || d > end) end = d;
+        });
+        const prazo = parseItemDate(item.prazo);
+        if (prazo && (!end || prazo > end)) end = prazo;
+      });
+      return { frente: f, start, end, bloco: FRENTE_BLOCO_UI[f.frente] || f.bloco };
+    });
+
+    const withDates = ranges.filter((r) => r.start && r.end);
+    const milestone = parseItemDate(
+      IS_LEGACY_HOME
+        ? state.kpis.inauguracao || "2026-11-26"
+        : state.projetoMeta.prazo_conclusao || state.kpis.prazo_conclusao || ""
+    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let rangeStart = withDates.length
+      ? new Date(Math.min(...withDates.map((r) => r.start.getTime())))
+      : new Date(today.getFullYear(), today.getMonth(), 1);
+    let rangeEnd = withDates.length
+      ? new Date(Math.max(...withDates.map((r) => r.end.getTime())))
+      : new Date(today.getFullYear(), today.getMonth() + 3, 1);
+    if (milestone) {
+      if (milestone < rangeStart) rangeStart = new Date(milestone);
+      if (milestone > rangeEnd) rangeEnd = new Date(milestone);
+    }
+    // margem de 1 semana
+    rangeStart = new Date(rangeStart.getTime() - 7 * 86400000);
+    rangeEnd = new Date(rangeEnd.getTime() + 14 * 86400000);
+    const totalMs = Math.max(rangeEnd - rangeStart, 86400000);
+
+    const months = [];
+    const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+    while (cursor <= rangeEnd) {
+      months.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    function pct(date) {
+      return Math.max(0, Math.min(100, ((date - rangeStart) / totalMs) * 100));
+    }
+
+    const monthHeaders = months
+      .map(
+        (m) =>
+          `<div class="gantt-month">${m.toLocaleDateString("pt-BR", {
+            month: "short",
+            year: "2-digit",
+          })}</div>`
+      )
+      .join("");
+
+    const todayPct = pct(today);
+    const milestonePct = milestone ? pct(milestone) : null;
+
+    const rows = ranges
+      .map((r) => {
+        const visual = blocoVisual(r.bloco);
+        const nome = frenteDisplayName(r.frente.frente);
+        let bar = '<div class="gantt-bar gantt-bar-empty" title="Sem datas suficientes"></div>';
+        if (r.start && r.end) {
+          const left = pct(r.start);
+          const right = pct(r.end);
+          const width = Math.max(2, right - left);
+          bar = `<div class="gantt-bar tone-${visual.tone}" style="left:${left}%;width:${width}%;" title="${escapeAttr(
+            nome
+          )}: ${fmtDate(
+            `${r.start.getFullYear()}-${String(r.start.getMonth() + 1).padStart(2, "0")}-${String(r.start.getDate()).padStart(2, "0")}`
+          )} → ${fmtDate(
+            `${r.end.getFullYear()}-${String(r.end.getMonth() + 1).padStart(2, "0")}-${String(r.end.getDate()).padStart(2, "0")}`
+          )}"></div>`;
+        }
+        return `
+          <div class="gantt-row">
+            <div class="gantt-label">${escapeHtml(nome)}</div>
+            <div class="gantt-track">${bar}</div>
+          </div>`;
+      })
+      .join("");
+
+    if (el.ganttNote) el.ganttNote.hidden = false;
+
+    el.ganttRoot.innerHTML = `
+      <div class="gantt" style="--gantt-cols:${months.length}">
+        <div class="gantt-months">
+          <div></div>${monthHeaders}
+        </div>
+        <div class="gantt-body">
+          ${
+            milestonePct != null
+              ? `<div class="gantt-marker gantt-marker-milestone" style="left:calc(var(--gantt-label) + (100% - var(--gantt-label)) * ${milestonePct / 100})" title="Marco do projeto"><span>marco</span></div>`
+              : ""
+          }
+          <div class="gantt-marker gantt-marker-today" style="left:calc(var(--gantt-label) + (100% - var(--gantt-label)) * ${todayPct / 100})" title="Hoje"><span>hoje</span></div>
+          ${rows}
+        </div>
+      </div>`;
+  }
+
   function renderAll() {
     el.atualizadoEm.textContent = fmtDateTime(state.atualizadoEm);
     renderRing();
     renderKpis();
     renderBlocks();
     renderAtencao();
+    renderGantt();
     renderTabs();
     renderViews();
   }

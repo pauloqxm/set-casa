@@ -24,6 +24,9 @@ FRENTE_TO_BLOCO = {
     "Evento de Inauguração": "inauguracao",
     "Parcerias Institucionais": "parcerias",
     "Implantação dos Serviços": "mudanca",
+    "Gestão Patrimonial": "patrimonio",
+    "Gestão Contratual e Financeira": "financeiro",
+    "Tecnologia e Infraestrutura Operacional": "ti",
 }
 
 BLOCO_LABELS = db.BLOCO_LABELS

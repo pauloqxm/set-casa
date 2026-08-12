@@ -21,6 +21,7 @@
     btnEditarProjeto: document.getElementById("btnEditarProjeto"),
     kpis: document.getElementById("kpis"),
     blocksRow: document.getElementById("blocksRow"),
+    frenteTag: document.getElementById("frenteTag"),
     resultCount: document.getElementById("resultCount"),
     btnNovaAcao: document.getElementById("btnNovaAcao"),
     tableBody: document.getElementById("tableBody"),
@@ -203,29 +204,136 @@
     el.projDialog.showModal();
   }
 
+  const KPI_ICONS = {
+    total:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2zm2 4v2h6V7H9zm0 4v2h6v-2H9z"/></svg>',
+    check:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.2 13.3 6-6-1.4-1.4-4.6 4.6-2.2-2.2-1.4 1.4 3.6 3.6z"/></svg>',
+    gear:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.8 7.8 0 0 0 .1-1l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0-.1 1l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg>',
+    people:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zM8 12a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 8 12zm8 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4zM8 14c-.3 0-.7 0-1 .1C4.6 14.5 2 15.7 2 18v2h4v-2c0-1.5.8-2.7 2.1-3.6-.7-.2-1.4-.4-2.1-.4z"/></svg>',
+    clock:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2z"/></svg>',
+    alert:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 21h22L12 3zm0 6h2v5h-2V9zm0 7h2v2h-2v-2z"/></svg>',
+  };
+
+  const BLOCO_VISUAL = {
+    reforma: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2zm2 4h6v2H9V7zm0 4h6v2H9v-2z"/></svg>',
+    },
+    restauro: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3zm-1 14-4-4 1.4-1.4L11 13.2l4.6-4.6L17 10l-6 6z"/></svg>',
+    },
+    aquisicao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm8.3 12.9 3.4 3.4-1.4 1.4-3.4-3.4A8 8 0 1 1 10 2a8 8 0 0 1 8.3 14.9z"/></svg>',
+    },
+    comunicacao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v12H7l-3 3V4zm3 4v2h10V8H7zm0 4v2h7v-2H7z"/></svg>',
+    },
+    inauguracao: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm13 8H4v10h16V10zM8 12h3v3H8v-3zm5 0h3v3h-3v-3z"/></svg>',
+    },
+    parcerias: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3c2.5 2.2 4 4.7 4 7.2A4 4 0 0 1 8 10.2C8 7.7 9.5 5.2 12 3zm-7 9a3.5 3.5 0 0 1 3.5 3.5V18H2v-2.5A3.5 3.5 0 0 1 5 12zm14 0a3.5 3.5 0 0 1 3.5 3.5V18h-6.5v-2.5A3.5 3.5 0 0 1 19 12zM12 13a3 3 0 0 1 3 3V18H9v-2a3 3 0 0 1 3-3z"/></svg>',
+    },
+    mudanca: {
+      tone: "blue",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg>',
+    },
+    outras: {
+      tone: "green",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>',
+    },
+  };
+
+  function blocoVisual(blocoId) {
+    return BLOCO_VISUAL[blocoId] || BLOCO_VISUAL.outras;
+  }
+
   function renderKpis() {
     const k = state.kpis || {};
     const dias = k.dias_para_conclusao !== undefined ? k.dias_para_conclusao : k.dias_para_inauguracao;
+    let prazoTxt = "Sem prazo definido";
+    if (dias == null) {
+      prazoTxt = fmtDate(k.prazo_conclusao || k.inauguracao);
+    } else if (dias >= 0) {
+      prazoTxt = `${dias} dia(s) restantes`;
+    } else {
+      prazoTxt = `${Math.abs(dias)} dia(s) após o prazo`;
+    }
     const cards = [
-      { tone: "blue", head: "Total de ações", value: k.total ?? 0 },
-      { tone: "green", head: "Concluídas", value: k.concluidos ?? 0 },
-      { tone: "green", head: "Progresso", value: `${k.progresso_pct ?? 0}%` },
-      { tone: "orange", head: "Críticas em aberto", value: k.criticas_abertas ?? 0 },
-      { tone: "orange", head: "Atrasadas", value: k.atrasadas ?? 0 },
+      {
+        tone: "green",
+        icon: KPI_ICONS.total,
+        head: "Total",
+        value: k.total ?? "—",
+        text: "Ações e entregas monitoradas",
+        status: "Escopo ativo",
+      },
+      {
+        tone: "green",
+        icon: KPI_ICONS.check,
+        head: "Concluídas",
+        value: k.concluidos ?? 0,
+        text: "Itens finalizados",
+        status: `Progresso ${k.progresso_pct ?? 0}%`,
+      },
       {
         tone: "blue",
-        head: "Prazo do projeto",
-        value: dias === null || dias === undefined ? "—" : `${dias} dia(s)`,
-        text: fmtDate(k.prazo_conclusao || k.inauguracao),
+        icon: KPI_ICONS.gear,
+        head: "Andamento",
+        value: k.em_andamento ?? 0,
+        text: "Em execução agora",
+        status: "Status",
+      },
+      {
+        tone: "teal",
+        icon: KPI_ICONS.people,
+        head: "Terceiros",
+        value: k.aguardando_terceiros ?? 0,
+        text: "Aguardando ação externa",
+        status: "Dependência",
+      },
+      {
+        tone: "orange",
+        icon: KPI_ICONS.clock,
+        head: "Não iniciadas",
+        value: k.nao_iniciados ?? 0,
+        text: "Ainda sem início formal",
+        status: "Fila",
+      },
+      {
+        tone: "red",
+        icon: KPI_ICONS.alert,
+        head: "Críticas / Atraso",
+        value: `${k.criticas_abertas ?? 0} / ${k.atrasadas ?? 0}`,
+        text: prazoTxt,
+        status: "Atenção",
       },
     ];
+    el.kpis.dataset.count = String(cards.length);
     el.kpis.innerHTML = cards
       .map(
         (c) => `
         <article class="kpi-card kpi-${c.tone}">
-          <div class="kpi-top"><span class="kpi-label">${escapeHtml(c.head)}</span></div>
+          <div class="kpi-top">
+            <span class="kpi-icon">${c.icon}</span>
+            <span class="kpi-label">${escapeHtml(c.head)}</span>
+          </div>
           <p class="kpi-value">${escapeHtml(String(c.value))}</p>
-          ${c.text ? `<p class="kpi-text">${escapeHtml(c.text)}</p>` : ""}
+          <p class="kpi-text">${escapeHtml(c.text)}</p>
+          <div class="kpi-foot">
+            <span>${escapeHtml(c.status)}</span>
+            <i class="kpi-dot" aria-hidden="true"></i>
+          </div>
         </article>`
       )
       .join("");
@@ -233,26 +341,63 @@
 
   function renderBlocks() {
     const frentes = state.frentes || [];
+    if (el.frenteTag) {
+      el.frenteTag.textContent = `${frentes.length} frente${frentes.length === 1 ? "" : "s"}`;
+    }
     if (!frentes.length) {
-      el.blocksRow.innerHTML = '<p class="muted">Nenhuma frente cadastrada ainda.</p>';
+      el.blocksRow.innerHTML = '<div class="empty">Sem frentes para exibir.</div>';
       return;
     }
     el.blocksRow.innerHTML = frentes
-      .map(
-        (f) => `
-        <div class="block">
+      .map((f) => {
+        const visual = blocoVisual(f.bloco);
+        const doneCls = Number(f.concluidos) > 0 ? " has-progress" : "";
+        return `
+        <div class="block block-${visual.tone}">
           <div class="block-top">
-            <div class="block-titles">
-              <div class="block-name">${escapeHtml(f.frente)}</div>
+            <div class="block-heading">
+              <span class="block-icon">${visual.icon}</span>
+              <div class="block-titles">
+                <div class="block-name">${escapeHtml(f.frente)}</div>
+                <div class="block-alt">${escapeHtml(f.bloco_label || "")}</div>
+              </div>
             </div>
             <div class="block-count">${f.total} itens</div>
           </div>
+          <div class="block-bar">
+            <div class="block-bar-track">
+              <span
+                class="block-seg is-done"
+                style="width:${f.pct_concluidos}%; background:var(--green);"
+                data-tip="Concluído: ${f.concluidos} (${f.pct_concluidos}%)"
+                title="Concluído: ${f.concluidos} (${f.pct_concluidos}%)"
+              ></span>
+              <span
+                class="block-seg is-progress"
+                style="width:${f.pct_andamento}%; background:var(--blue);"
+                data-tip="Em andamento: ${f.em_andamento} (${f.pct_andamento}%)"
+                title="Em andamento: ${f.em_andamento} (${f.pct_andamento}%)"
+              ></span>
+              <span
+                class="block-seg is-waiting"
+                style="width:${f.pct_aguardando}%; background:var(--orange);"
+                data-tip="Aguardando terceiros: ${f.aguardando_terceiros} (${f.pct_aguardando}%)"
+                title="Aguardando terceiros: ${f.aguardando_terceiros} (${f.pct_aguardando}%)"
+              ></span>
+              <span
+                class="block-seg is-rest"
+                style="width:${f.pct_outros}%; background:#d8d8d8;"
+                data-tip="Demais: ${f.outros} (${f.pct_outros}%)"
+                title="Demais: ${f.outros} (${f.pct_outros}%)"
+              ></span>
+            </div>
+          </div>
           <div class="block-foot">
             <span>Concluído</span>
-            <b><span>${f.concluidos}</span>/${f.total}</b>
+            <b class="block-ratio${doneCls}"><span>${f.concluidos}</span>/${f.total}</b>
           </div>
-        </div>`
-      )
+        </div>`;
+      })
       .join("");
   }
 

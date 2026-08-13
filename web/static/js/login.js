@@ -12,7 +12,7 @@
       if (!res.ok) return;
       const data = await res.json();
       if (data.usuario) {
-        location.replace("/");
+        location.replace("/portfolio.html");
       }
     } catch (_) {}
   }
@@ -43,7 +43,7 @@
         error.hidden = false;
         return;
       }
-      location.replace("/");
+      location.replace("/portfolio.html");
     } catch (_) {
       error.textContent = "Falha de conexão com o servidor.";
       error.hidden = false;

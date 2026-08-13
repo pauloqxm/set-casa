@@ -617,7 +617,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/painel.html"
         elif path == "/login.html" and self._current_user():
             self.send_response(302)
-            self.send_header("Location", "/")
+            self.send_header("Location", "/portfolio.html")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return

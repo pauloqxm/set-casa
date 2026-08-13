@@ -50,9 +50,12 @@ textarea {
 }
 
 .topbar {
-  background: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: #e9ece9;
   border-bottom: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
 .topbar-inner,

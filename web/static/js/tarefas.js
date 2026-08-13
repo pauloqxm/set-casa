@@ -10,6 +10,7 @@
     btnLimparFiltros: document.getElementById("btnLimparFiltros"),
     filtroPrazoDe: document.getElementById("filtroPrazoDe"),
     filtroPrazoAte: document.getElementById("filtroPrazoAte"),
+    filtroProjetoWrap: document.getElementById("filtroProjetoWrap"),
     filtroProjeto: document.getElementById("filtroProjeto"),
     filtroStatus: document.getElementById("filtroStatus"),
     filtroPrioridade: document.getElementById("filtroPrioridade"),
@@ -155,6 +156,13 @@
       const node = el.filterForm.elements.namedItem(key);
       if (node && "value" in node) node.value = value || "";
     });
+    updateFilterVisibility();
+  }
+
+  function updateFilterVisibility() {
+    const origemProjeto = el.filtroOrigem.value === "projeto";
+    if (el.filtroProjetoWrap) el.filtroProjetoWrap.hidden = !origemProjeto;
+    if (!origemProjeto && el.filtroProjeto) el.filtroProjeto.value = "";
   }
 
   function renderKpis(kpis) {
@@ -531,6 +539,7 @@
       { value: "projeto", label: "Projeto" },
       ...state.origens.map((o) => ({ value: o.id, label: o.label })),
     ]);
+    updateFilterVisibility();
 
     renderKpis(data.kpis);
     renderRankings(data.rankings);
@@ -646,8 +655,11 @@
   el.btnLimparFiltros.addEventListener("click", () => {
     el.filterForm.reset();
     initDefaultFilters();
+    updateFilterVisibility();
     loadTarefas().catch((err) => console.error(err));
   });
+
+  el.filtroOrigem.addEventListener("change", updateFilterVisibility);
 
   el.temProjeto.addEventListener("change", updateModalVisibility);
 

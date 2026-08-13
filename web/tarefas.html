@@ -103,12 +103,6 @@
               <input type="date" id="filtroPrazoAte" name="prazo_ate" />
             </label>
             <label>
-              Projeto
-              <select id="filtroProjeto" name="projeto_id">
-                <option value="">Todos</option>
-              </select>
-            </label>
-            <label>
               Status
               <select id="filtroStatus" name="status">
                 <option value="">Todos</option>
@@ -133,6 +127,12 @@
               <select id="filtroOrigem" name="origem">
                 <option value="">Todas</option>
                 <option value="projeto">Projeto</option>
+              </select>
+            </label>
+            <label id="filtroProjetoWrap" hidden>
+              Projeto
+              <select id="filtroProjeto" name="projeto_id">
+                <option value="">Todos</option>
               </select>
             </label>
             <label>

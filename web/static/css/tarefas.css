@@ -1,0 +1,133 @@
+.tarefas-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.tarefas-filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted, #666);
+}
+
+.tarefas-filter-grid input,
+.tarefas-filter-grid select {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.tarefas-filter-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.tarefas-rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.25rem;
+}
+
+.tarefas-ranking h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.tarefas-rank-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted, #666);
+}
+
+.tarefas-rank-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.tarefas-rank-list li {
+  margin-bottom: 0.45rem;
+}
+
+.tarefas-rank-list a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tarefas-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.tarefa-card .tarefa-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.tarefa-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: #f0f0f0;
+  color: #444;
+}
+
+.tarefa-badge-projeto {
+  background: #e8f4fc;
+  color: #1565a8;
+}
+
+.tarefa-badge-origem {
+  background: #fff3e6;
+  color: #c45a00;
+}
+
+.tarefa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.modal-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.modal-erro {
+  color: #b00020;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+@media (max-width: 640px) {
+  .tarefas-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tarefas-filter-actions {
+    grid-column: 1 / -1;
+  }
+}

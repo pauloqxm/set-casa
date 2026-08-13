@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SET Projetos · Tarefas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/auth.css" />
+    <link rel="stylesheet" href="/static/css/portfolio.css" />
+    <link rel="stylesheet" href="/static/css/tarefas.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="topbar-inner topbar-grid">
+          <div class="topbar-brand">
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img
+                class="logo logo-set"
+                src="/static/img/logo-set.jpg"
+                alt="Ceará — Governo do Estado · Secretaria do Trabalho"
+                width="120"
+                height="120"
+              />
+              <img
+                class="logo logo-idt"
+                src="/static/img/logo-idt.png"
+                alt="Instituto de Desenvolvimento do Trabalho"
+                width="220"
+                height="72"
+              />
+            </div>
+            <div class="topbar-titles">
+              <p class="eyebrow">SET / IDT · Secretaria do Trabalho</p>
+              <h1>Tarefas</h1>
+              <p class="topbar-meta">
+                Lago de cards transversal · mesma base de ações dos painéis de projeto
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <nav class="user-nav" id="userNav" aria-label="Menu">
+        <button
+          type="button"
+          class="user-nav-toggle"
+          id="userNavToggle"
+          aria-expanded="false"
+          aria-controls="userNavItems"
+        >
+          <span class="user-nav-toggle-label">Menu</span>
+          <span class="user-nav-toggle-icon" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </button>
+        <div class="user-nav-items" id="userNavItems">
+          <span class="user-chip" id="userChip" hidden>—</span>
+          <button type="button" class="btn-ghost btn-small" id="btnVoltar">
+            ← Voltar
+          </button>
+          <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
+          <a class="btn-ghost btn-small" href="/tarefas.html">Tarefas</a>
+          <a class="btn-ghost btn-small" id="linkProjetos" href="/projetos.html" hidden>
+            Gerenciar projetos
+          </a>
+          <a class="btn-ghost btn-small" id="linkAdmin" href="/admin.html" hidden>
+            Usuários
+          </a>
+          <button type="button" class="btn-run btn-small" id="btnNovaTarefa" hidden>
+            Nova tarefa
+          </button>
+          <button type="button" class="btn-ghost btn-small" id="btnSair">
+            Sair
+          </button>
+        </div>
+      </nav>
+
+      <main class="wrap">
+        <section class="panel tarefas-filters" aria-label="Filtros">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2>Filtros</h2>
+              <p>Prazo no período · demais critérios opcionais</p>
+            </div>
+            <button type="button" class="btn-ghost btn-small" id="btnLimparFiltros">
+              Limpar
+            </button>
+          </div>
+          <form class="tarefas-filter-grid" id="filterForm">
+            <label>
+              Prazo de
+              <input type="date" id="filtroPrazoDe" name="prazo_de" />
+            </label>
+            <label>
+              Prazo até
+              <input type="date" id="filtroPrazoAte" name="prazo_ate" />
+            </label>
+            <label>
+              Projeto
+              <select id="filtroProjeto" name="projeto_id">
+                <option value="">Todos</option>
+              </select>
+            </label>
+            <label>
+              Status
+              <select id="filtroStatus" name="status">
+                <option value="">Todos</option>
+              </select>
+            </label>
+            <label>
+              Prioridade
+              <select id="filtroPrioridade" name="prioridade">
+                <option value="">Todas</option>
+                <option value="Crítica">Crítica</option>
+                <option value="Alta">Alta</option>
+                <option value="Média">Média</option>
+                <option value="Baixa">Baixa</option>
+              </select>
+            </label>
+            <label>
+              Responsável
+              <input type="search" id="filtroResponsavel" name="responsavel" placeholder="Nome" />
+            </label>
+            <label>
+              Origem
+              <select id="filtroOrigem" name="origem">
+                <option value="">Todas</option>
+                <option value="projeto">Projeto</option>
+              </select>
+            </label>
+            <label>
+              Ordenar
+              <select id="filtroOrdenar" name="ordenar">
+                <option value="prazo">Prazo</option>
+                <option value="atraso">Atraso</option>
+                <option value="prioridade">Prioridade</option>
+              </select>
+            </label>
+            <div class="tarefas-filter-actions">
+              <button type="submit" class="btn-run btn-small">Aplicar</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+        <section class="panel tarefas-rankings" aria-label="Rankings">
+          <div class="tarefas-rankings-grid">
+            <div class="tarefas-ranking">
+              <h3>Projetos críticos</h3>
+              <ol id="rankProjetos" class="tarefas-rank-list"></ol>
+            </div>
+            <div class="tarefas-ranking">
+              <h3>Responsáveis com atrasos</h3>
+              <p class="tarefas-rank-hint">Agrupado pelo nome informado no card</p>
+              <ol id="rankResponsaveis" class="tarefas-rank-list"></ol>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="tarefasTitle">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2 id="tarefasTitle">Cards de tarefas</h2>
+              <p id="tarefasSubtitle">Cross-projeto · clique no projeto para abrir o painel</p>
+            </div>
+            <span class="tag" id="tarefasCount">—</span>
+          </div>
+          <div class="cards tarefas-cards" id="tarefasCards"></div>
+          <p class="portfolio-empty" id="tarefasEmpty" hidden>Nenhuma tarefa com os filtros atuais.</p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-strip" aria-hidden="true">
+          <span class="strip-green"></span>
+          <span class="strip-blue"></span>
+          <span class="strip-orange"></span>
+        </div>
+        <p>SET Projetos — SET / IDT</p>
+      </footer>
+    </div>
+
+    <dialog id="modalTarefa" class="dialog" aria-labelledby="modalTarefaTitle">
+      <form method="dialog" id="formTarefa">
+        <header>
+          <p class="eyebrow">Tarefa</p>
+          <h3 id="modalTarefaTitle">Nova tarefa</h3>
+        </header>
+        <input type="hidden" id="tarefaId" name="id" value="" />
+        <label class="checkbox-row" id="rowTemProjeto">
+          <input type="checkbox" id="temProjeto" name="tem_projeto" checked />
+          Tem relação com um projeto
+        </label>
+        <div id="blocoProjeto">
+          <label>
+            Projeto
+            <select id="tarefaProjeto" name="projeto_id"></select>
+          </label>
+          <label>
+            Frente
+            <select id="tarefaFrente" name="frente">
+              <option value="">— Selecione o projeto —</option>
+            </select>
+          </label>
+        </div>
+        <div id="blocoOrigem" hidden>
+          <label>
+            Origem
+            <select id="tarefaOrigem" name="origem"></select>
+          </label>
+        </div>
+        <label>
+          Entrega / título
+          <input type="text" id="tarefaEntrega" name="entrega" required />
+        </label>
+        <label>
+          Responsável
+          <input type="text" id="tarefaResponsavel" name="responsavel" />
+        </label>
+        <label>
+          Próxima providência
+          <textarea id="tarefaProxima" name="proxima" rows="2"></textarea>
+        </label>
+        <div class="dialog-dates">
+          <label>
+            Prazo
+            <input type="date" id="tarefaPrazo" name="prazo" />
+          </label>
+          <label>
+            Prioridade
+            <select id="tarefaPrioridade" name="prioridade">
+              <option value="">—</option>
+              <option value="Crítica">Crítica</option>
+              <option value="Alta">Alta</option>
+              <option value="Média">Média</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="tarefaStatus" name="status"></select>
+          </label>
+        </div>
+        <label>
+          Observações
+          <textarea id="tarefaObs" name="obs" rows="2"></textarea>
+        </label>
+        <p class="modal-erro" id="modalErro" hidden></p>
+        <div class="dialog-actions-right">
+          <button type="button" class="btn-ghost" id="btnCancelarModal">Cancelar</button>
+          <button type="submit" class="btn-run" id="btnSalvarTarefa">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/js/nav-menu.js"></script>
+    <script src="/static/js/tarefas.js"></script>
+  </body>
+</html>

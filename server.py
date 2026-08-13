@@ -10,7 +10,7 @@ from datetime import date, datetime
 from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import db
 
@@ -279,6 +279,111 @@ def portfolio_response(user: dict) -> dict:
     return {"ok": True, "projetos": out}
 
 
+def tarefas_response(user: dict, query: str = "") -> dict:
+    params = parse_qs(query or "")
+
+    def qp(key: str, default: str = "") -> str:
+        vals = params.get(key, [])
+        return (vals[0] if vals else default).strip()
+
+    filtro = {
+        "prazo_de": qp("prazo_de"),
+        "prazo_ate": qp("prazo_ate"),
+        "projeto_id": qp("projeto_id"),
+        "status": qp("status"),
+        "prioridade": qp("prioridade"),
+        "responsavel": qp("responsavel"),
+        "origem": qp("origem"),
+        "ordenar": qp("ordenar", "prazo") or "prazo",
+    }
+    raw, nomes, papeis = db.list_tarefas_for_usuario(user, **filtro)
+    itens = annotate_items(raw)
+    kpis = compute_kpis(raw)
+
+    by_proj: dict[str, list[dict]] = {}
+    for row in raw:
+        pid = row.get("projeto_id") or ""
+        if pid == db.TAREFAS_GERAIS_ID:
+            continue
+        by_proj.setdefault(pid, []).append(row)
+
+    criticos = []
+    for pid, rows in by_proj.items():
+        pk = compute_kpis(rows)
+        score = (
+            pk["criticas_abertas"] * 3
+            + pk["atrasadas"] * 2
+            + max(0, int(100 - pk["progresso_pct"]))
+        )
+        criticos.append(
+            {
+                "id": pid,
+                "nome": nomes.get(pid, pid),
+                "atrasadas": pk["atrasadas"],
+                "criticas": pk["criticas_abertas"],
+                "progresso_pct": pk["progresso_pct"],
+                "score": score,
+            }
+        )
+    criticos.sort(key=lambda x: (-x["score"], -x["atrasadas"], x["nome"]))
+    criticos = criticos[:5]
+
+    resp_map: dict[str, dict] = {}
+    for item in itens:
+        if is_done(item.get("status", "")) or is_na(item.get("status", "")):
+            continue
+        nome = (item.get("responsavel") or "").strip() or "—"
+        bucket = resp_map.setdefault(
+            nome, {"nome": nome, "total_abertas": 0, "atrasadas": 0}
+        )
+        bucket["total_abertas"] += 1
+        if item.get("atrasado"):
+            bucket["atrasadas"] += 1
+    responsaveis = sorted(
+        resp_map.values(), key=lambda x: (-x["atrasadas"], -x["total_abertas"], x["nome"])
+    )[:5]
+
+    admin = user.get("papel") == "admin"
+    tarefas = []
+    for item in itens:
+        pid = item.get("projeto_id") or ""
+        meu_papel = papeis.get(pid)
+        if pid == db.TAREFAS_GERAIS_ID and admin:
+            meu_papel = "admin"
+        tarefas.append(
+            {
+                **item,
+                "projeto_nome": nomes.get(pid, pid),
+                "origem_label": db.ORIGEM_LABELS.get(
+                    item.get("origem") or db.ORIGEM_PROJETO, ""
+                ),
+                "meu_papel": meu_papel,
+                "pode_editar": db.pode_editar_tarefa(user, item),
+            }
+        )
+
+    origens = [
+        {"id": k, "label": v}
+        for k, v in db.ORIGEM_LABELS.items()
+        if k != db.ORIGEM_PROJETO
+    ]
+
+    return {
+        "ok": True,
+        "filtro": filtro,
+        "kpis": kpis,
+        "rankings": {
+            "projetos_criticos": criticos,
+            "responsaveis": responsaveis,
+        },
+        "tarefas": tarefas,
+        "projetos": db.projetos_acessiveis_usuario(user),
+        "origens": origens,
+        "pode_criar_institucional": admin,
+        "status_options": db.DEFAULT_STATUS_OPTIONS,
+    }
+
+
 def is_public_path(path: str) -> bool:
     if path in PUBLIC_PATHS:
         return True
@@ -469,6 +574,16 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(portfolio_response(user))
             return
 
+        if path == "/api/tarefas":
+            user = self._current_user()
+            if not user:
+                return
+            if not db.projetos_acessiveis_usuario(user) and user.get("papel") != "admin":
+                self._send_json({"ok": False, "erro": "Sem projetos acessíveis"}, 403)
+                return
+            self._send_json(tarefas_response(user, parsed.query))
+            return
+
         if path == "/api/projetos":
             if not self._require_admin():
                 return
@@ -485,6 +600,20 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
                 return
             self._send_json({"ok": True, "projeto": projeto})
+            return
+
+        proj_frentes_match = re.fullmatch(r"/api/projetos/([^/]+)/frentes", path)
+        if proj_frentes_match:
+            projeto_id = proj_frentes_match.group(1)
+            if projeto_id == db.TAREFAS_GERAIS_ID:
+                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                return
+            user = self._require_projeto_role(projeto_id, "consulta")
+            if not user:
+                return
+            self._send_json(
+                {"ok": True, "frentes": db.frentes_for_projeto(projeto_id)}
+            )
             return
 
         proj_painel_match = re.fullmatch(r"/api/projetos/([^/]+)/painel", path)
@@ -610,10 +739,25 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/admin.html"
         elif path in ("/portfolio", "/portfolio.html"):
             self.path = "/portfolio.html"
+        elif path in ("/tarefas", "/tarefas.html"):
+            user = self._current_user()
+            if not db.projetos_acessiveis_usuario(user) and user.get("papel") != "admin":
+                self.send_response(302)
+                self.send_header("Location", "/portfolio.html")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+            self.path = "/tarefas.html"
         elif path in ("/projetos", "/projetos.html"):
             self.path = "/projetos.html"
         elif re.fullmatch(r"/projeto/[^/]+/?", path):
             projeto_id_pagina = path.strip("/").split("/")[1]
+            if projeto_id_pagina == db.TAREFAS_GERAIS_ID:
+                self.send_response(302)
+                self.send_header("Location", "/tarefas.html")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
             if not self._require_projeto_role(projeto_id_pagina, "consulta"):
                 return
             self.path = "/painel.html"
@@ -672,6 +816,24 @@ class Handler(SimpleHTTPRequestHandler):
         if proj_item_match:
             projeto_id, item_id = proj_item_match.groups()
             user = self._require_projeto_role(projeto_id, "editor")
+            if not user:
+                return
+            return self._patch_item(projeto_id, item_id, user)
+
+        tarefa_match = re.fullmatch(r"/api/tarefas/([^/]+)", path)
+        if tarefa_match:
+            item_id = tarefa_match.group(1)
+            with db.connect() as conn:
+                db.init_db(conn)
+                current = db.get_item(conn, item_id)
+            if not current:
+                self._send_json({"ok": False, "erro": "Tarefa não encontrada"}, 404)
+                return
+            projeto_id = current.get("projeto_id") or db.CASA_TRABALHADOR_ID
+            if projeto_id == db.TAREFAS_GERAIS_ID:
+                user = self._require_admin()
+            else:
+                user = self._require_projeto_role(projeto_id, "editor")
             if not user:
                 return
             return self._patch_item(projeto_id, item_id, user)
@@ -940,6 +1102,32 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": str(exc)}, 400)
                 return
             self._send_json({"ok": True, "projeto": created}, status=201)
+            return
+
+        if path == "/api/tarefas":
+            user = self._require_user()
+            if not user:
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_tarefa(body, usuario=user)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            item = annotate_items([created])[0]
+            pid = created.get("projeto_id") or db.CASA_TRABALHADOR_ID
+            projetos = {p["id"]: p["nome"] for p in db.projetos_acessiveis_usuario(user)}
+            projetos[db.TAREFAS_GERAIS_ID] = "Institucional"
+            item["projeto_nome"] = projetos.get(pid, pid)
+            item["origem_label"] = db.ORIGEM_LABELS.get(
+                created.get("origem") or db.ORIGEM_PROJETO, ""
+            )
+            item["pode_editar"] = db.pode_editar_tarefa(user, created)
+            self._send_json({"ok": True, "tarefa": item}, status=201)
             return
 
         proj_itens_match = re.fullmatch(r"/api/projetos/([^/]+)/itens", path)

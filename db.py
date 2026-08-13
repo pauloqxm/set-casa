@@ -87,6 +87,7 @@ ITEM_FIELDS = (
     "bloco",
     "bloco_label",
     "projeto_id",
+    "origem",
 )
 
 EDITABLE_FIELDS = (
@@ -139,6 +140,22 @@ PAPEL_LABELS = {
 
 # Projeto legado: todo dado existente antes do portfólio pertence a ele.
 CASA_TRABALHADOR_ID = "casa-trabalhador"
+TAREFAS_GERAIS_ID = "set-tarefas"
+
+ORIGEM_PROJETO = "projeto"
+ORIGENS_INSTITUCIONAIS = (
+    "comite_executivo",
+    "comite_contratos",
+    "secretaria",
+    "geral",
+)
+ORIGEM_LABELS = {
+    "projeto": "Projeto",
+    "comite_executivo": "Comitê Executivo",
+    "comite_contratos": "Comitê de Contratos",
+    "secretaria": "Demanda da Secretaria",
+    "geral": "Geral",
+}
 
 DEFAULT_STATUS_OPTIONS = [
     "Não iniciado",
@@ -520,12 +537,15 @@ CREATE TABLE IF NOT EXISTS itens (
     bloco TEXT NOT NULL DEFAULT 'outras',
     bloco_label TEXT NOT NULL DEFAULT 'Outras',
     projeto_id TEXT NOT NULL DEFAULT 'casa-trabalhador',
+    origem TEXT NOT NULL DEFAULT 'projeto',
     atualizado_em TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_itens_frente ON itens(frente);
 CREATE INDEX IF NOT EXISTS idx_itens_status ON itens(status);
 CREATE INDEX IF NOT EXISTS idx_itens_bloco ON itens(bloco);
+CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem);
+CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo);
 
 CREATE TABLE IF NOT EXISTS historico (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -634,12 +654,15 @@ CREATE TABLE IF NOT EXISTS itens (
     bloco TEXT NOT NULL DEFAULT 'outras',
     bloco_label TEXT NOT NULL DEFAULT 'Outras',
     projeto_id TEXT NOT NULL DEFAULT 'casa-trabalhador',
+    origem TEXT NOT NULL DEFAULT 'projeto',
     atualizado_em TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_itens_frente ON itens(frente);
 CREATE INDEX IF NOT EXISTS idx_itens_status ON itens(status);
 CREATE INDEX IF NOT EXISTS idx_itens_bloco ON itens(bloco);
+CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem);
+CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo);
 
 CREATE TABLE IF NOT EXISTS historico (
     id SERIAL PRIMARY KEY,
@@ -741,6 +764,7 @@ def init_db(conn: _ConnProxy) -> None:
         _migrate_papeis(conn)
         _seed_admin_inicial(conn)
         _seed_projeto_casa_trabalhador(conn)
+        _seed_projeto_tarefas_gerais(conn)
         _seed_usuario_projetos_inicial(conn)
         _SCHEMA_READY = True
 
@@ -779,6 +803,15 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             conn.execute(
                 "ALTER TABLE projetos ADD COLUMN inicio_projeto TEXT NOT NULL DEFAULT ''"
             )
+        if not _has_col("itens", "origem"):
+            conn.execute(
+                "ALTER TABLE itens ADD COLUMN origem TEXT NOT NULL DEFAULT 'projeto'"
+            )
+            conn.execute(
+                "UPDATE itens SET origem = 'projeto' WHERE TRIM(COALESCE(origem, '')) = ''"
+            )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo)")
         conn.execute(
             """
             UPDATE projetos
@@ -808,8 +841,18 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             f"ALTER TABLE itens ADD COLUMN projeto_id TEXT NOT NULL "
             f"DEFAULT '{CASA_TRABALHADOR_ID}'"
         )
+    if "origem" not in cols:
+        conn.execute(
+            "ALTER TABLE itens ADD COLUMN origem TEXT NOT NULL DEFAULT 'projeto'"
+        )
+        conn.execute(
+            "UPDATE itens SET origem = 'projeto' "
+            "WHERE TRIM(IFNULL(origem, '')) = ''"
+        )
     # A coluna já existe agora (recém-criada ou já presente no CREATE TABLE)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_projeto ON itens(projeto_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo)")
 
     hist_raw = conn._conn.execute("PRAGMA table_info(historico)").fetchall()
     hist_cols = {row[1] for row in hist_raw}
@@ -863,6 +906,41 @@ def _seed_projeto_casa_trabalhador(conn: _ConnProxy) -> None:
             "SET / IDT · Acompanhamento gerencial",
             "2024-07-01",
             "2026-11-26",
+            json.dumps(config, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+
+
+def _seed_projeto_tarefas_gerais(conn: _ConnProxy) -> None:
+    """Projeto-reservatório para tarefas institucionais (sem projeto vinculado)."""
+    row = conn.execute(
+        "SELECT 1 FROM projetos WHERE id=?", (TAREFAS_GERAIS_ID,)
+    ).fetchone()
+    if row:
+        return
+    now = datetime.now().isoformat(timespec="seconds")
+    config = {
+        "layout": "painel-set",
+        "blocos": dict(BLOCO_LABELS),
+        "frente_to_bloco": {},
+        "status_options": list(DEFAULT_STATUS_OPTIONS),
+        "reservatorio_tarefas": True,
+    }
+    conn.execute(
+        """
+        INSERT INTO projetos (
+            id, nome, descricao, gerente_usuario_id, inicio_projeto, prazo_conclusao,
+            config_json, ativo, criado_em, atualizado_em
+        ) VALUES (?, ?, ?, NULL, ?, ?, ?, 0, ?, ?)
+        """,
+        (
+            TAREFAS_GERAIS_ID,
+            "Tarefas institucionais",
+            "Reservatório interno — tarefas do Comitê, Contratos e Secretaria",
+            "",
+            "",
             json.dumps(config, ensure_ascii=False),
             now,
             now,
@@ -1044,6 +1122,8 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         values["data_mudanca"] = values["inicio"]
     if not values.get("projeto_id"):
         values["projeto_id"] = CASA_TRABALHADOR_ID
+    if not values.get("origem"):
+        values["origem"] = ORIGEM_PROJETO
     values["atualizado_em"] = now or datetime.now().isoformat(timespec="seconds")
     params = (
         values["id"],
@@ -1064,6 +1144,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         values["bloco"],
         values["bloco_label"],
         values["projeto_id"],
+        values["origem"],
         values["atualizado_em"],
     )
     conn.execute(
@@ -1071,11 +1152,11 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         INSERT INTO itens (
             id, frente, entrega, inicio, data_mudanca, nup, responsavel, parceiros,
             prioridade, prazo, status, pct, proxima, obs, foto, bloco, bloco_label,
-            projeto_id, atualizado_em
+            projeto_id, origem, atualizado_em
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?
+            ?, ?, ?
         )
         ON CONFLICT(id) DO UPDATE SET
             frente=excluded.frente,
@@ -1094,6 +1175,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
             foto=excluded.foto,
             bloco=excluded.bloco,
             bloco_label=excluded.bloco_label,
+            origem=excluded.origem,
             atualizado_em=excluded.atualizado_em
         """,
         params,
@@ -1265,6 +1347,7 @@ def create_item(
             "bloco": bloco,
             "bloco_label": bloco_label,
             "projeto_id": projeto_id,
+            "origem": (payload.get("origem") or ORIGEM_PROJETO).strip() or ORIGEM_PROJETO,
         }
         if not item["entrega"]:
             raise ValueError("Informe a entrega/ação")
@@ -1733,14 +1816,18 @@ def _list_projetos(conn: _ConnProxy, *, somente_ativos: bool = False) -> list[di
         sql += " WHERE p.ativo = 1"
     sql += " ORDER BY lower(p.nome)"
     rows = conn.execute(sql).fetchall()
-    return [_projeto_public(r) for r in rows]
+    return [_projeto_public(r) for r in rows if r["id"] != TAREFAS_GERAIS_ID]
 
 
 def portfolio_for_usuario(usuario: dict) -> list[dict]:
     """Retorna projetos acessíveis + itens em 1 conexão (evita N+1 do portfólio)."""
     with connect() as conn:
         init_db(conn)
-        projetos = _list_projetos(conn, somente_ativos=True)
+        projetos = [
+            p
+            for p in _list_projetos(conn, somente_ativos=True)
+            if p["id"] != TAREFAS_GERAIS_ID
+        ]
         if not projetos:
             return []
 
@@ -1783,6 +1870,199 @@ def portfolio_for_usuario(usuario: dict) -> list[dict]:
                 }
             )
         return out
+
+
+def _papeis_projetos(conn: _ConnProxy, usuario: dict) -> dict[str, str]:
+    projetos = [
+        p
+        for p in _list_projetos(conn, somente_ativos=True)
+        if p["id"] != TAREFAS_GERAIS_ID
+    ]
+    if usuario.get("papel") == "admin":
+        return {p["id"]: "admin" for p in projetos}
+    rows = conn.execute(
+        "SELECT projeto_id, papel FROM usuario_projetos WHERE usuario_id=?",
+        (usuario.get("id"),),
+    ).fetchall()
+    return {
+        r["projeto_id"]: r["papel"]
+        for r in rows
+        if r["projeto_id"] != TAREFAS_GERAIS_ID
+    }
+
+
+def projetos_acessiveis_usuario(usuario: dict) -> list[dict]:
+    """Projetos visíveis ao usuário (exceto reservatório de tarefas)."""
+    with connect() as conn:
+        init_db(conn)
+        papeis = _papeis_projetos(conn, usuario)
+        if not papeis:
+            return []
+        projetos = [
+            p
+            for p in _list_projetos(conn, somente_ativos=True)
+            if p["id"] in papeis
+        ]
+        out = []
+        for p in projetos:
+            out.append(
+                {
+                    "id": p["id"],
+                    "nome": p["nome"],
+                    "papel": papeis[p["id"]],
+                }
+            )
+        return out
+
+
+def frentes_for_projeto(projeto_id: str) -> list[str]:
+    with connect() as conn:
+        init_db(conn)
+        rows = conn.execute(
+            """
+            SELECT DISTINCT frente FROM itens
+            WHERE projeto_id=? AND TRIM(COALESCE(frente, '')) != ''
+            ORDER BY lower(frente)
+            """,
+            (projeto_id,),
+        ).fetchall()
+        frentes = [r["frente"] for r in rows]
+        projeto = get_projeto(conn, projeto_id)
+        if projeto:
+            try:
+                config = json.loads(projeto.get("config_json") or "{}")
+            except json.JSONDecodeError:
+                config = {}
+            for frente in (config.get("frente_to_bloco") or {}).keys():
+                if frente and frente not in frentes:
+                    frentes.append(frente)
+        return frentes
+
+
+def list_tarefas_for_usuario(
+    usuario: dict,
+    *,
+    prazo_de: str = "",
+    prazo_ate: str = "",
+    projeto_id: str = "",
+    status: str = "",
+    prioridade: str = "",
+    responsavel: str = "",
+    origem: str = "",
+    ordenar: str = "prazo",
+) -> tuple[list[dict], dict[str, str], dict[str, str]]:
+    """Lista itens acessíveis como tarefas + mapas projeto_nome e meu_papel."""
+    with connect() as conn:
+        init_db(conn)
+        papeis = _papeis_projetos(conn, usuario)
+        admin_global = usuario.get("papel") == "admin"
+        if not papeis and not admin_global:
+            return [], {}, {}
+
+        projeto_ids = list(papeis.keys())
+        scopes: list[str] = []
+        params: list = []
+        if projeto_ids:
+            ph = ",".join("?" for _ in projeto_ids)
+            scopes.append(f"projeto_id IN ({ph})")
+            params.extend(projeto_ids)
+        if admin_global:
+            scopes.append("projeto_id = ?")
+            params.append(TAREFAS_GERAIS_ID)
+        if not scopes:
+            return [], {}, {}
+
+        where = " OR ".join(scopes)
+        sql = f"SELECT * FROM itens WHERE ({where})"
+        if prazo_de:
+            sql += " AND TRIM(COALESCE(prazo, '')) != '' AND prazo >= ?"
+            params.append(prazo_de.strip())
+        if prazo_ate:
+            sql += " AND TRIM(COALESCE(prazo, '')) != '' AND prazo <= ?"
+            params.append(prazo_ate.strip())
+        if projeto_id:
+            sql += " AND projeto_id = ?"
+            params.append(projeto_id.strip())
+        if status:
+            sql += " AND lower(status) = lower(?)"
+            params.append(status.strip())
+        if prioridade:
+            sql += " AND lower(prioridade) = lower(?)"
+            params.append(prioridade.strip())
+        if responsavel:
+            sql += " AND lower(responsavel) LIKE lower(?)"
+            params.append(f"%{responsavel.strip()}%")
+        if origem:
+            sql += " AND origem = ?"
+            params.append(origem.strip())
+
+        rows = conn.execute(sql, tuple(params)).fetchall()
+        items = [row_to_item(r) for r in rows]
+
+        nomes: dict[str, str] = {TAREFAS_GERAIS_ID: "Institucional"}
+        for p in _list_projetos(conn, somente_ativos=False):
+            if p["id"] != TAREFAS_GERAIS_ID:
+                nomes[p["id"]] = p["nome"]
+
+        if ordenar == "atraso":
+            items.sort(
+                key=lambda i: (
+                    0 if (i.get("prazo") and i.get("status") not in ("Concluído", "Concluido"))
+                    else 1,
+                    i.get("prazo") or "9999",
+                    i.get("id") or "",
+                )
+            )
+        elif ordenar == "prioridade":
+            prio_rank = {"crítica": 0, "critica": 0, "alta": 1, "média": 2, "media": 2, "baixa": 3}
+            items.sort(
+                key=lambda i: (
+                    prio_rank.get((i.get("prioridade") or "").casefold(), 9),
+                    i.get("prazo") or "9999",
+                    i.get("id") or "",
+                )
+            )
+        else:
+            items.sort(key=lambda i: (i.get("prazo") or "9999", i.get("id") or ""))
+
+        return items, nomes, papeis
+
+
+def create_tarefa(payload: dict, *, usuario: dict | None = None) -> dict:
+    tem_projeto = payload.get("tem_projeto")
+    if tem_projeto is None:
+        tem_projeto = bool((payload.get("projeto_id") or "").strip())
+    if isinstance(tem_projeto, str):
+        tem_projeto = tem_projeto.strip().lower() in ("1", "true", "sim", "yes")
+
+    if tem_projeto:
+        projeto_id = (payload.get("projeto_id") or "").strip()
+        if not projeto_id or projeto_id == TAREFAS_GERAIS_ID:
+            raise ValueError("Selecione o projeto")
+        if not pode_editar_projeto(usuario, projeto_id):
+            raise ValueError("Sem permissão para criar tarefa neste projeto")
+        body = dict(payload)
+        body["origem"] = ORIGEM_PROJETO
+        return create_item(body, projeto_id=projeto_id, usuario=usuario)
+
+    if not usuario or usuario.get("papel") != "admin":
+        raise ValueError("Apenas administradores podem criar tarefas institucionais")
+    origem = (payload.get("origem") or "").strip()
+    if origem not in ORIGENS_INSTITUCIONAIS:
+        raise ValueError("Selecione a origem institucional")
+    body = dict(payload)
+    body["origem"] = origem
+    body["frente"] = ""
+    return create_item(body, projeto_id=TAREFAS_GERAIS_ID, usuario=usuario)
+
+
+def pode_editar_tarefa(usuario: dict | None, item: dict) -> bool:
+    if not usuario or not item:
+        return False
+    projeto_id = item.get("projeto_id") or CASA_TRABALHADOR_ID
+    if projeto_id == TAREFAS_GERAIS_ID:
+        return usuario.get("papel") == "admin"
+    return pode_editar_projeto(usuario, projeto_id)
 
 
 def get_projeto(conn: _ConnProxy, projeto_id: str) -> dict | None:

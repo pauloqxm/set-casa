@@ -42,7 +42,7 @@ Legenda: ✅ existe hoje · 🟡 parcial · 🔴 não existe · 📋 MVP Fase 1
 | Criar ação no projeto | POST item | `POST /api/projetos/{id}/itens` | Nova ação | ✅ |
 | Espelhar no módulo Tarefas | Mesma entidade | Mesmo `item_id` | — | 📋 automático (mesma API) |
 | Tarefa ligada a projeto | `projeto_id` | `itens.projeto_id` | Painel por projeto | ✅ |
-| Tarefa Comitê / Contratos / Secretário | Origem institucional | — | — | 🔴 Fase 2 — `origem` + projeto virtual |
+| Tarefa Comitê / Contratos / Secretário | Origem institucional | `origem` + `set-tarefas` | `/tarefas.html` | ✅ |
 | Dashboard % projetos | KPIs agregados | `compute_kpis` + portfolio | `/portfolio.html` | 🟡 estender |
 | Dashboard % atividades gerais | KPIs cross-projeto | — | — | 📋 `GET /api/tarefas/dashboard` |
 | Ranking projetos críticos | Ordenar por atrasadas + críticas | KPIs por projeto | — | 📋 top N na dashboard Tarefas |
@@ -67,7 +67,7 @@ Legenda: ✅ existe hoje · 🟡 parcial · 🔴 não existe · 📋 MVP Fase 1
 | % progresso | `pct` | Sim | |
 | Anexo | `foto` | Sim | Upload base64 |
 | Atrasada | calculado | — | `dias_prazo < 0` (já em `annotate_items`) |
-| Origem institucional | **novo** `origem` | Fase 2 | `projeto` \| `comite_executivo` \| `comite_contratos` \| `secretaria` |
+| Origem institucional | **novo** `origem` | Sim (criação institucional) | `projeto` \| `comite_executivo` \| `comite_contratos` \| `secretaria` \| `geral` |
 | Assignee sistema | **novo** `responsavel_usuario_id` | Fase 2 | FK `usuarios.id` opcional |
 
 ### 2.4 APIs propostas (MVP Fase 1)

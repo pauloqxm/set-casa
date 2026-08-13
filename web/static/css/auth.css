@@ -155,10 +155,20 @@
 }
 
 .user-nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
   display: flex;
+  justify-content: flex-end;
   align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px max(16px, calc((100% - 1200px) / 2));
+  box-sizing: border-box;
+  background: #e9ece9;
+  border-bottom: 1px solid var(--line);
 }
 
 .user-nav a {
@@ -175,6 +185,7 @@
   color: var(--green-dark);
   font-size: 0.78rem;
   font-weight: 700;
+  margin-right: auto;
 }
 
 .admin-wrap {

@@ -544,8 +544,6 @@ CREATE TABLE IF NOT EXISTS itens (
 CREATE INDEX IF NOT EXISTS idx_itens_frente ON itens(frente);
 CREATE INDEX IF NOT EXISTS idx_itens_status ON itens(status);
 CREATE INDEX IF NOT EXISTS idx_itens_bloco ON itens(bloco);
-CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem);
-CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo);
 
 CREATE TABLE IF NOT EXISTS historico (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -661,8 +659,6 @@ CREATE TABLE IF NOT EXISTS itens (
 CREATE INDEX IF NOT EXISTS idx_itens_frente ON itens(frente);
 CREATE INDEX IF NOT EXISTS idx_itens_status ON itens(status);
 CREATE INDEX IF NOT EXISTS idx_itens_bloco ON itens(bloco);
-CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem);
-CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo);
 
 CREATE TABLE IF NOT EXISTS historico (
     id SERIAL PRIMARY KEY,

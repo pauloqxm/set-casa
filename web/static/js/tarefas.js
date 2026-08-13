@@ -159,22 +159,115 @@
 
   function renderKpis(kpis) {
     if (!el.kpis || !kpis) return;
-    const cards = [
-      { label: "Total", value: kpis.total ?? 0 },
-      { label: "Concluídas", value: kpis.concluidos ?? 0 },
-      { label: "Atrasadas", value: kpis.atrasadas ?? 0 },
-      { label: "Críticas abertas", value: kpis.criticas_abertas ?? 0 },
-      { label: "Progresso global", value: `${kpis.progresso_pct ?? 0}%` },
+    const k = kpis;
+    const pct = Number(k.progresso_pct || 0);
+    const icons = {
+      list:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 6h2v2H4V6zm0 5h2v2H4v-2zm0 5h2v2H4v-2zm4-10h12v2H8V6zm0 5h12v2H8v-2zm0 5h12v2H8v-2z"/></svg>',
+      check:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.2 13.3 6-6-1.4-1.4-4.6 4.6-2.2-2.2-1.4 1.4 3.6 3.6z"/></svg>',
+      chart:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 19h14v2H5v-2zm2-8h3v6H7v-6zm4-3h3v9h-3V8zm4 5h3v4h-3v-4z"/></svg>',
+      clock:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm1 11H7v-2h4V7h2z"/></svg>',
+      alert:
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 21h22L12 3zm0 6h2v5h-2V9zm0 7h2v2h-2v-2z"/></svg>',
+    };
+
+    function cardHtml(c) {
+      const bar =
+        c.bar != null
+          ? `<div class="tarefas-kpi-bar" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, c.bar))}%"></span></div>`
+          : "";
+      return `
+      <article class="kpi-card kpi-${c.tone}">
+        <div class="kpi-top">
+          <span class="kpi-icon">${c.icon}</span>
+          <span class="kpi-label">${escapeHtml(c.head)}</span>
+        </div>
+        <p class="kpi-value">${escapeHtml(c.value)}</p>
+        <p class="kpi-text">${escapeHtml(c.text)}</p>
+        ${bar}
+        <div class="kpi-foot">
+          <span>${escapeHtml(c.status)}</span>
+          <i class="kpi-dot" aria-hidden="true"></i>
+        </div>
+      </article>`;
+    }
+
+    const fluxo = [
+      {
+        tone: "blue",
+        icon: icons.list,
+        head: "Total",
+        value: k.total ?? 0,
+        text: "Tarefas no filtro atual",
+        status: "Carteira",
+      },
+      {
+        tone: "green",
+        icon: icons.check,
+        head: "Concluídas",
+        value: k.concluidos ?? 0,
+        text: "Finalizadas no período",
+        status: "Entregues",
+      },
+      {
+        tone: "teal",
+        icon: icons.chart,
+        head: "Progresso global",
+        value: `${pct}%`,
+        text: "Média de avanço das tarefas",
+        status: "Evolução",
+        bar: pct,
+      },
     ];
-    el.kpis.innerHTML = cards
-      .map(
-        (c) => `
-      <article class="kpi">
-        <span class="kpi-label">${escapeHtml(c.label)}</span>
-        <strong class="kpi-value">${escapeHtml(c.value)}</strong>
-      </article>`
-      )
-      .join("");
+
+    const atencao = [
+      {
+        tone: "orange",
+        icon: icons.clock,
+        head: "Atrasadas",
+        value: k.atrasadas ?? 0,
+        text: "Com prazo vencido",
+        status: "Prazo",
+      },
+      {
+        tone: "red",
+        icon: icons.alert,
+        head: "Críticas abertas",
+        value: k.criticas_abertas ?? 0,
+        text: "Prioridade crítica em aberto",
+        status: "Prioridade",
+      },
+    ];
+
+    el.kpis.innerHTML = `
+      <div class="kpi-groups">
+        <div class="kpi-group">
+          <p class="kpi-group-label">Panorama do lago</p>
+          <div class="kpis-row tarefas-kpis-fluxo">${fluxo.map(cardHtml).join("")}</div>
+        </div>
+        <div class="kpi-group">
+          <p class="kpi-group-label">Pontos de atenção</p>
+          <div class="kpis-row tarefas-kpis-atencao">${atencao.map(cardHtml).join("")}</div>
+        </div>
+      </div>`;
+  }
+
+  function initials(nome) {
+    const parts = String(nome || "?")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!parts.length || parts[0] === "—") return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function rankBar(pct, tone) {
+    const w = Math.min(100, Math.max(0, Number(pct) || 0));
+    return `<div class="tarefas-rank-bar" aria-hidden="true"><span class="tarefas-rank-bar-fill ${tone}" style="width:${w}%"></span></div>`;
   }
 
   function renderRankings(rankings) {
@@ -183,24 +276,56 @@
     el.rankProjetos.innerHTML = projetos.length
       ? projetos
           .map(
-            (p) => `
-        <li>
-          <a href="${escapeAttr(projetoHref(p.id))}">
-            ${escapeHtml(p.nome)}
-          </a>
-          · ${p.atrasadas} atrasada(s) · ${p.criticas} crítica(s) · ${p.progresso_pct}%
+            (p, idx) => `
+        <li class="tarefas-rank-item">
+          <span class="tarefas-rank-pos">${idx + 1}</span>
+          <div class="tarefas-rank-body">
+            <div class="tarefas-rank-title-row">
+              <a class="tarefas-rank-title" href="${escapeAttr(projetoHref(p.id))}">
+                ${escapeHtml(p.nome)}
+              </a>
+              <span class="tarefas-rank-pct">${p.progresso_pct}%</span>
+            </div>
+            ${rankBar(p.progresso_pct, "green")}
+            <div class="tarefas-rank-stats">
+              <span class="tarefas-rank-stat tarefas-rank-stat-warn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1 21h22L12 3zm0 6h2v5h-2V9zm0 7h2v2h-2v-2z"/></svg>
+                ${p.criticas} crítica(s)
+              </span>
+              <span class="tarefas-rank-stat tarefas-rank-stat-late">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm1 11H7v-2h4V7h2z"/></svg>
+                ${p.atrasadas} atrasada(s)
+              </span>
+            </div>
+          </div>
         </li>`
           )
           .join("")
-      : "<li>Nenhum projeto no ranking.</li>";
+      : '<li class="tarefas-rank-empty">Nenhum projeto no ranking.</li>';
     el.rankResponsaveis.innerHTML = responsaveis.length
       ? responsaveis
           .map(
-            (r) =>
-              `<li>${escapeHtml(r.nome)} · ${r.atrasadas} atrasada(s) de ${r.total_abertas} aberta(s)</li>`
+            (r, idx) => {
+              const pct =
+                r.total_abertas > 0
+                  ? Math.round((100 * r.atrasadas) / r.total_abertas)
+                  : 0;
+              return `
+        <li class="tarefas-rank-item">
+          <span class="tarefas-rank-avatar" aria-hidden="true">${escapeHtml(initials(r.nome))}</span>
+          <div class="tarefas-rank-body">
+            <div class="tarefas-rank-title-row">
+              <strong class="tarefas-rank-title">${escapeHtml(r.nome)}</strong>
+              <span class="tarefas-rank-pct">${r.atrasadas}/${r.total_abertas}</span>
+            </div>
+            ${rankBar(pct, "orange")}
+            <p class="tarefas-rank-meta">${r.atrasadas} atrasada(s) de ${r.total_abertas} aberta(s)</p>
+          </div>
+        </li>`;
+            }
           )
           .join("")
-      : "<li>Nenhum responsável com atrasos.</li>";
+      : '<li class="tarefas-rank-empty">Nenhum responsável com atrasos.</li>';
   }
 
   function renderCards(tarefas) {

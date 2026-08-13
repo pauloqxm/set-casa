@@ -1,3 +1,36 @@
+.tarefas-dashboard {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tarefas-dashboard .kpis {
+  margin-bottom: 0;
+}
+
+.tarefas-kpis-fluxo {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.tarefas-kpis-atencao {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.tarefas-kpi-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #ececec;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.tarefas-kpi-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0d9488, #39b54a);
+}
+
 .tarefas-filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
@@ -30,34 +63,206 @@
 
 .tarefas-rankings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
 }
 
-.tarefas-ranking h3 {
-  margin: 0 0 0.5rem;
+.tarefas-ranking-card {
+  background: var(--white, #fff);
+  border: 1px solid var(--line, #e4e4e4);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.06));
+}
+
+.tarefas-ranking-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.tarefas-ranking-head h3 {
+  margin: 0 0 0.2rem;
   font-size: 1rem;
 }
 
+.tarefas-ranking-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tarefas-ranking-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.tarefas-ranking-icon-projetos {
+  color: #1565a8;
+  background: #e8f4fc;
+}
+
+.tarefas-ranking-icon-pessoas {
+  color: #c45a00;
+  background: #fff3e6;
+}
+
 .tarefas-rank-hint {
-  margin: 0 0 0.75rem;
+  margin: 0;
   font-size: 0.78rem;
   color: var(--muted, #666);
 }
 
 .tarefas-rank-list {
+  list-style: none;
   margin: 0;
-  padding-left: 1.1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
 }
 
-.tarefas-rank-list li {
+.tarefas-rank-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line, #ececec);
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.tarefas-rank-pos {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  background: #ed7526;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.tarefas-rank-avatar {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(135deg, #39b54a, #0d9488);
+  flex-shrink: 0;
+}
+
+.tarefas-rank-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tarefas-rank-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.tarefas-rank-title {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.tarefas-rank-title:hover {
+  color: #ed7526;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tarefas-rank-pct {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft, #666);
+  white-space: nowrap;
+}
+
+.tarefas-rank-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e8e8e8;
+  overflow: hidden;
   margin-bottom: 0.45rem;
 }
 
-.tarefas-rank-list a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.tarefas-rank-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.tarefas-rank-bar-fill.green {
+  background: linear-gradient(90deg, #39b54a, #0d9488);
+}
+
+.tarefas-rank-bar-fill.orange {
+  background: linear-gradient(90deg, #ed7526, #c1443c);
+}
+
+.tarefas-rank-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tarefas-rank-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.tarefas-rank-stat svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.tarefas-rank-stat-warn {
+  background: #fdecec;
+  color: #c1443c;
+}
+
+.tarefas-rank-stat-late {
+  background: #fff3e6;
+  color: #c45a00;
+}
+
+.tarefas-rank-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-soft, #666);
+}
+
+.tarefas-rank-empty {
+  padding: 0.75rem;
+  color: var(--muted, #666);
+  font-size: 0.85rem;
 }
 
 .tarefas-cards {
@@ -102,14 +307,6 @@
   margin-top: 0.75rem;
 }
 
-.checkbox-row {
-  flex-direction: row !important;
-  align-items: center;
-  gap: 0.5rem !important;
-  font-weight: 600 !important;
-  color: #333 !important;
-}
-
 .tarefa-projeto-toggle {
   padding: 0.75rem 1rem;
   background: linear-gradient(135deg, #fff8f0 0%, #ffe8d6 100%);
@@ -150,16 +347,11 @@
   font-size: 0.72rem;
 }
 
-.modal-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: 0.75rem;
-}
-
-.modal-erro {
-  color: #b00020;
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
+@media (max-width: 900px) {
+  .tarefas-kpis-fluxo,
+  .tarefas-kpis-atencao {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 640px) {
@@ -169,5 +361,10 @@
 
   .tarefas-filter-actions {
     grid-column: 1 / -1;
+  }
+
+  .tarefas-kpis-fluxo,
+  .tarefas-kpis-atencao {
+    grid-template-columns: 1fr;
   }
 }

@@ -27,6 +27,7 @@
     modalTitle: document.getElementById("modalTarefaTitle"),
     modalErro: document.getElementById("modalErro"),
     btnCancelarModal: document.getElementById("btnCancelarModal"),
+    btnExcluirTarefa: document.getElementById("btnExcluirTarefa"),
     tarefaId: document.getElementById("tarefaId"),
     temProjeto: document.getElementById("temProjeto"),
     blocoProjeto: document.getElementById("blocoProjeto"),
@@ -53,6 +54,7 @@
     statusOptions: [],
     podeCriarInstitucional: false,
     editMode: false,
+    editingItem: null,
   };
 
   const DONE = new Set(["concluído", "concluido"]);
@@ -235,6 +237,9 @@
           actions.push(
             `<button type="button" class="btn-ghost btn-small" data-edit="${escapeAttr(item.id)}">Editar</button>`
           );
+          actions.push(
+            `<button type="button" class="btn-danger btn-small" data-excluir="${escapeAttr(item.id)}">Excluir</button>`
+          );
           if (!DONE.has((item.status || "").toLowerCase())) {
             actions.push(
               `<button type="button" class="btn-run btn-small" data-concluir="${escapeAttr(item.id)}">Concluir</button>`
@@ -290,6 +295,11 @@
       el.temProjeto.checked = true;
       el.blocoOrigem.hidden = true;
     }
+    if (el.btnExcluirTarefa) {
+      el.btnExcluirTarefa.hidden = !(
+        state.editMode && state.editingItem && state.editingItem.pode_editar
+      );
+    }
   }
 
   function cacheFrentes(projetos) {
@@ -325,6 +335,7 @@
 
   function openModal(mode, item) {
     state.editMode = mode === "edit";
+    state.editingItem = state.editMode ? item : null;
     el.modalErro.hidden = true;
     el.modalErro.textContent = "";
     el.modalTitle.textContent = state.editMode ? "Editar tarefa" : "Nova tarefa";
@@ -468,6 +479,21 @@
     }
   }
 
+  async function excluirTarefa(id) {
+    const item = state.tarefas.find((t) => t.id === id);
+    const titulo = item?.entrega || id;
+    if (!window.confirm(`Excluir a tarefa "${titulo}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      await api(`/api/tarefas/${encodeURIComponent(id)}`, { method: "DELETE" });
+      closeModal();
+      await loadTarefas();
+    } catch (err) {
+      window.alert(err.message || "Erro ao excluir tarefa");
+    }
+  }
+
   async function concluirTarefa(id) {
     if (!window.confirm("Marcar esta tarefa como concluída?")) return;
     try {
@@ -512,6 +538,13 @@
   el.formTarefa.addEventListener("submit", salvarTarefa);
   el.btnCancelarModal.addEventListener("click", closeModal);
 
+  if (el.btnExcluirTarefa) {
+    el.btnExcluirTarefa.addEventListener("click", () => {
+      const id = el.tarefaId.value;
+      if (id) excluirTarefa(id);
+    });
+  }
+
   el.btnNovaTarefa.addEventListener("click", () => openModal("new"));
 
   el.tarefasCards.addEventListener("click", (event) => {
@@ -519,6 +552,11 @@
     if (editBtn) {
       const item = state.tarefas.find((t) => t.id === editBtn.dataset.edit);
       if (item) openModal("edit", item);
+      return;
+    }
+    const excluirBtn = event.target.closest("[data-excluir]");
+    if (excluirBtn) {
+      excluirTarefa(excluirBtn.dataset.excluir);
       return;
     }
     const concluirBtn = event.target.closest("[data-concluir]");

@@ -195,10 +195,12 @@
           <h3 id="modalTarefaTitle">Nova tarefa</h3>
         </header>
         <input type="hidden" id="tarefaId" name="id" value="" />
-        <label class="checkbox-row" id="rowTemProjeto">
-          <input type="checkbox" id="temProjeto" name="tem_projeto" checked />
-          Tem relação com um projeto
-        </label>
+        <div class="tarefa-projeto-toggle" id="rowTemProjeto">
+          <label class="tarefa-projeto-check" for="temProjeto">
+            <input type="checkbox" id="temProjeto" name="tem_projeto" checked />
+            <span>Tem relação com um projeto</span>
+          </label>
+        </div>
         <div id="blocoProjeto">
           <label>
             Projeto
@@ -254,9 +256,16 @@
           <textarea id="tarefaObs" name="obs" rows="2"></textarea>
         </label>
         <p class="modal-erro" id="modalErro" hidden></p>
-        <div class="dialog-actions-right">
-          <button type="button" class="btn-ghost" id="btnCancelarModal">Cancelar</button>
-          <button type="submit" class="btn-run" id="btnSalvarTarefa">Salvar</button>
+        <div class="dialog-actions">
+          <div class="dialog-actions-left">
+            <button type="button" class="btn-danger btn-small" id="btnExcluirTarefa" hidden>
+              Excluir
+            </button>
+          </div>
+          <div class="dialog-actions-right">
+            <button type="button" class="btn-ghost" id="btnCancelarModal">Cancelar</button>
+            <button type="submit" class="btn-run" id="btnSalvarTarefa">Salvar</button>
+          </div>
         </div>
       </form>
     </dialog>

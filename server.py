@@ -969,6 +969,28 @@ class Handler(SimpleHTTPRequestHandler):
             )
             return
 
+        tarefa_del_match = re.fullmatch(r"/api/tarefas/([^/]+)", path)
+        if tarefa_del_match:
+            item_id = tarefa_del_match.group(1)
+            with db.connect() as conn:
+                db.init_db(conn)
+                current = db.get_item(conn, item_id)
+            if not current:
+                self._send_json({"ok": False, "erro": "Tarefa não encontrada"}, 404)
+                return
+            projeto_id = current.get("projeto_id") or db.CASA_TRABALHADOR_ID
+            if projeto_id == db.TAREFAS_GERAIS_ID:
+                user = self._require_admin()
+            else:
+                user = self._require_projeto_role(projeto_id, "editor")
+            if not user:
+                return
+            if not db.delete_item(item_id, usuario=user):
+                self._send_json({"ok": False, "erro": "Tarefa não encontrada"}, 404)
+                return
+            self._send_json({"ok": True, "removido": item_id})
+            return
+
         proj_item_del_match = re.fullmatch(r"/api/projetos/([^/]+)/itens/([^/]+)", path)
         if proj_item_del_match:
             projeto_id, item_id = proj_item_del_match.groups()

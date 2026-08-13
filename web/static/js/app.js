@@ -29,21 +29,6 @@
     return `${apiHistorico(itemId)}/${encodeURIComponent(histId)}`;
   }
 
-  const BLOCOS = [
-    { id: "todas", label: "Todas" },
-    { id: "reforma", label: "Reforma" },
-    { id: "restauro", label: "Restauro" },
-    { id: "aquisicao", label: "Aquisição" },
-    { id: "comunicacao", label: "Comunicação" },
-    { id: "inauguracao", label: "Inauguração" },
-    { id: "parcerias", label: "Parcerias" },
-    { id: "mudanca", label: "Mudança" },
-    { id: "patrimonio", label: "Patrimônio" },
-    { id: "financeiro", label: "Financeiro" },
-    { id: "ti", label: "TI / Operacional" },
-    { id: "outras", label: "Outras" },
-  ];
-
   const FRENTES_PADRAO = [
     "Infraestrutura",
     "Restauro e Patrimônio Histórico",
@@ -193,6 +178,7 @@
     projNome: document.getElementById("projNome"),
     projDescricao: document.getElementById("projDescricao"),
     projGerente: document.getElementById("projGerente"),
+    projInicio: document.getElementById("projInicio"),
     projPrazo: document.getElementById("projPrazo"),
     projError: document.getElementById("projError"),
     projCancel: document.getElementById("projCancel"),
@@ -334,7 +320,8 @@
     const q = state.search.trim().toLowerCase();
     return sortItems(
       state.itens.filter((item) => {
-        if (state.bloco !== "todas" && resolveBloco(item) !== state.bloco) return false;
+        if (state.bloco !== "todas" && itemFrenteKey(item) !== state.bloco)
+          return false;
         if (state.status && item.status !== state.status) return false;
         if (
           !state.showConcluidos &&
@@ -527,11 +514,11 @@
     "Comunicação Institucional": "Comunicação",
     "Evento de Inauguração": "Inauguração",
     "Parcerias Institucionais": "Parcerias",
-    "Implantação dos Serviços": "Mudança de unidade",
+    "Implantação dos Serviços": "Mudança",
     "Gestão Patrimonial": "Patrimônio",
     "Gestão Contratual e Financeira": "Financeiro",
-    "Tecnologia e Infraestrutura Operacional": "TI / Operacional",
-    "Sem frente": "Sem categoria",
+    "Tecnologia e Infraestrutura Operacional": "TI",
+    "Sem frente": "Outras",
   };
 
   const FRENTE_BLOCO_UI = {
@@ -547,18 +534,50 @@
     "Tecnologia e Infraestrutura Operacional": "ti",
   };
 
+  function itemFrenteKey(item) {
+    return (item.frente || "").trim() || "Sem frente";
+  }
+
   function frenteDisplayName(frente) {
     if ((frente || "").trim() === "Sem frente") return "Itens não classificados";
     return frente || "Sem frente";
   }
 
-  function frenteEtiqueta(frente, fallback) {
-    return FRENTE_ETIQUETA[frente] || fallback || "Outras";
+  /** Rótulo curto (uma palavra) para abas/etiquetas, a partir da frente. */
+  function frenteTabLabel(frente) {
+    const key = (frente || "").trim() || "Sem frente";
+    if (FRENTE_ETIQUETA[key]) return FRENTE_ETIQUETA[key];
+    const first = key.split(/[\s/\-–—]+/).filter(Boolean)[0];
+    if (!first || first.toLowerCase() === "sem") return "Outras";
+    return first.charAt(0).toUpperCase() + first.slice(1);
   }
 
-  function resolveBloco(item) {
-    const frente = (item.frente || "").trim();
-    return FRENTE_BLOCO_UI[frente] || item.bloco || "outras";
+  function frenteEtiqueta(frente, fallback) {
+    if (FRENTE_ETIQUETA[frente]) return FRENTE_ETIQUETA[frente];
+    if (fallback && fallback !== "Outras") {
+      const word = String(fallback).split(/[\s/\-–—]+/).filter(Boolean)[0];
+      if (word) return word;
+    }
+    return frenteTabLabel(frente);
+  }
+
+  function buildTabsFromFrentes() {
+    const frentes = state.frentes || [];
+    const used = new Map();
+    const tabs = [{ id: "todas", label: "Todas" }];
+    frentes.forEach((f) => {
+      const id = f.frente || "Sem frente";
+      let label = frenteTabLabel(id);
+      if (used.has(label)) {
+        const n = used.get(label) + 1;
+        used.set(label, n);
+        label = `${label}${n}`;
+      } else {
+        used.set(label, 1);
+      }
+      tabs.push({ id, label });
+    });
+    return tabs;
   }
 
   const BLOCO_VISUAL = {
@@ -626,18 +645,19 @@
     }
     el.blocks.innerHTML = frentes
       .map((f) => {
-        const blocoId = FRENTE_BLOCO_UI[f.frente] || f.bloco || "outras";
-        const active = state.bloco === blocoId ? " is-active" : "";
+        const frenteKey = f.frente || "Sem frente";
+        const blocoId = FRENTE_BLOCO_UI[frenteKey] || f.bloco || "outras";
+        const active = state.bloco === frenteKey ? " is-active" : "";
         const visual = blocoVisual(blocoId);
         const doneCls = Number(f.concluidos) > 0 ? " has-progress" : "";
-        const nome = frenteDisplayName(f.frente);
-        const etiqueta = frenteEtiqueta(f.frente, f.bloco_label);
+        const nome = frenteDisplayName(frenteKey);
+        const etiqueta = frenteEtiqueta(frenteKey, f.bloco_label);
         const extra =
-          (f.frente || "") === "Sem frente"
+          frenteKey === "Sem frente"
             ? '<div class="block-hint">Fora da grade de frentes principais</div>'
             : "";
         return `
-        <button type="button" class="block block-${visual.tone}${active}" data-bloco="${escapeAttr(blocoId)}">
+        <button type="button" class="block block-${visual.tone}${active}" data-frente="${escapeAttr(frenteKey)}">
           <div class="block-top">
             <div class="block-heading">
               <span class="block-icon">${visual.icon}</span>
@@ -858,12 +878,20 @@
   }
 
   function renderTabs() {
-    el.tabs.innerHTML = BLOCOS.map(
-      (b) => `
-      <button type="button" class="tab${state.bloco === b.id ? " is-active" : ""}" data-bloco="${b.id}" role="tab" aria-selected="${state.bloco === b.id}">
-        ${b.label}
+    const tabs = buildTabsFromFrentes();
+    const activeId = state.bloco || "todas";
+    const stillExists =
+      activeId === "todas" || tabs.some((t) => t.id === activeId);
+    if (!stillExists) state.bloco = "todas";
+    const current = state.bloco || "todas";
+    el.tabs.innerHTML = tabs
+      .map(
+        (b) => `
+      <button type="button" class="tab${current === b.id ? " is-active" : ""}" data-frente="${escapeAttr(b.id)}" role="tab" aria-selected="${current === b.id}" title="${escapeAttr(b.id === "todas" ? "Todas as frentes" : b.id)}">
+        ${escapeHtml(b.label)}
       </button>`
-    ).join("");
+      )
+      .join("");
   }
 
   function sortByTempoAsc(list) {
@@ -1083,26 +1111,39 @@
     });
 
     const withDates = ranges.filter((r) => r.start && r.end);
+    const projetoInicio = parseItemDate(state.projetoMeta.inicio_projeto || "");
     const milestone = parseItemDate(
       IS_LEGACY_HOME
-        ? state.kpis.inauguracao || "2026-11-26"
+        ? state.kpis.inauguracao ||
+            state.projetoMeta.prazo_conclusao ||
+            "2026-11-26"
         : state.projetoMeta.prazo_conclusao || state.kpis.prazo_conclusao || ""
     );
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let rangeStart = withDates.length
-      ? new Date(Math.min(...withDates.map((r) => r.start.getTime())))
-      : new Date(today.getFullYear(), today.getMonth(), 1);
+    let rangeStart;
+    if (projetoInicio) {
+      rangeStart = new Date(projetoInicio);
+    } else if (withDates.length) {
+      rangeStart = new Date(Math.min(...withDates.map((r) => r.start.getTime())));
+    } else {
+      rangeStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
     let rangeEnd = withDates.length
       ? new Date(Math.max(...withDates.map((r) => r.end.getTime())))
       : new Date(today.getFullYear(), today.getMonth() + 3, 1);
+    if (withDates.length && projetoInicio) {
+      const minAction = Math.min(...withDates.map((r) => r.start.getTime()));
+      if (minAction < rangeStart.getTime()) rangeStart = new Date(minAction);
+    }
     if (milestone) {
       if (milestone < rangeStart) rangeStart = new Date(milestone);
       if (milestone > rangeEnd) rangeEnd = new Date(milestone);
     }
-    // margem de 1 semana
-    rangeStart = new Date(rangeStart.getTime() - 7 * 86400000);
+    if (!projetoInicio) {
+      rangeStart = new Date(rangeStart.getTime() - 7 * 86400000);
+    }
     rangeEnd = new Date(rangeEnd.getTime() + 14 * 86400000);
     const totalMs = Math.max(rangeEnd - rangeStart, 86400000);
 
@@ -1446,6 +1487,7 @@
       descricao: data.descricao || "",
       gerente_usuario_id: data.gerente_usuario_id,
       gerente_nome: data.gerente_nome || "",
+      inicio_projeto: data.inicio_projeto || "",
       prazo_conclusao: data.prazo_conclusao || "",
       meu_papel: data.meu_papel || "",
     };
@@ -1622,8 +1664,8 @@
     await loadPainel();
   }
 
-  function setBloco(bloco) {
-    state.bloco = bloco || "todas";
+  function setBloco(frente) {
+    state.bloco = frente || "todas";
     state.cardsPage = 1;
     renderTabs();
     renderBlocks();
@@ -1631,16 +1673,16 @@
   }
 
   el.tabs.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-bloco]");
+    const btn = e.target.closest("[data-frente]");
     if (!btn) return;
-    setBloco(btn.dataset.bloco);
+    setBloco(btn.dataset.frente);
   });
 
   el.blocks.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-bloco]");
+    const btn = e.target.closest("[data-frente]");
     if (!btn) return;
-    const bloco = btn.dataset.bloco;
-    setBloco(state.bloco === bloco ? "todas" : bloco);
+    const frente = btn.dataset.frente;
+    setBloco(state.bloco === frente ? "todas" : frente);
   });
 
   const viewToggle = document.querySelector(".view-toggle");
@@ -1835,6 +1877,7 @@
       const p = state.projetoMeta || {};
       el.projNome.value = p.nome || "";
       el.projDescricao.value = p.descricao || "";
+      if (el.projInicio) el.projInicio.value = (p.inicio_projeto || "").slice(0, 10);
       el.projPrazo.value = (p.prazo_conclusao || "").slice(0, 10);
       const opts = ['<option value="">— Sem gerente definido —</option>'];
       state.usuariosOpcoes.forEach((u) => {
@@ -1867,6 +1910,7 @@
             body: JSON.stringify({
               nome: el.projNome.value.trim(),
               descricao: el.projDescricao.value.trim(),
+              inicio_projeto: el.projInicio ? el.projInicio.value || "" : "",
               prazo_conclusao: el.projPrazo.value || "",
               gerente_usuario_id: el.projGerente.value
                 ? Number(el.projGerente.value)

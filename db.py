@@ -570,6 +570,7 @@ CREATE TABLE IF NOT EXISTS projetos (
     nome TEXT NOT NULL DEFAULT '',
     descricao TEXT NOT NULL DEFAULT '',
     gerente_usuario_id INTEGER,
+    inicio_projeto TEXT NOT NULL DEFAULT '',
     prazo_conclusao TEXT NOT NULL DEFAULT '',
     config_json TEXT NOT NULL DEFAULT '{}',
     ativo INTEGER NOT NULL DEFAULT 1,
@@ -683,6 +684,7 @@ CREATE TABLE IF NOT EXISTS projetos (
     nome TEXT NOT NULL DEFAULT '',
     descricao TEXT NOT NULL DEFAULT '',
     gerente_usuario_id INTEGER,
+    inicio_projeto TEXT NOT NULL DEFAULT '',
     prazo_conclusao TEXT NOT NULL DEFAULT '',
     config_json TEXT NOT NULL DEFAULT '{}',
     ativo INTEGER NOT NULL DEFAULT 1,
@@ -773,6 +775,18 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             conn.execute(
                 "ALTER TABLE historico ADD COLUMN usuario_nome TEXT NOT NULL DEFAULT ''"
             )
+        if not _has_col("projetos", "inicio_projeto"):
+            conn.execute(
+                "ALTER TABLE projetos ADD COLUMN inicio_projeto TEXT NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            """
+            UPDATE projetos
+            SET inicio_projeto = '2024-07-01'
+            WHERE id = ? AND TRIM(COALESCE(inicio_projeto, '')) = ''
+            """,
+            (CASA_TRABALHADOR_ID,),
+        )
         ensure_uploads_dir()
         return
 
@@ -805,6 +819,22 @@ def _ensure_columns(conn: _ConnProxy) -> None:
         conn.execute(
             "ALTER TABLE historico ADD COLUMN usuario_nome TEXT NOT NULL DEFAULT ''"
         )
+
+    proj_raw = conn._conn.execute("PRAGMA table_info(projetos)").fetchall()
+    proj_cols = {row[1] for row in proj_raw}
+    if "inicio_projeto" not in proj_cols:
+        conn.execute(
+            "ALTER TABLE projetos ADD COLUMN inicio_projeto TEXT NOT NULL DEFAULT ''"
+        )
+    # Casa legada: base do cronograma se ainda não definida
+    conn.execute(
+        """
+        UPDATE projetos
+        SET inicio_projeto = '2024-07-01'
+        WHERE id = ? AND TRIM(IFNULL(inicio_projeto, '')) = ''
+        """,
+        (CASA_TRABALHADOR_ID,),
+    )
     ensure_uploads_dir()
 
 
@@ -823,14 +853,15 @@ def _seed_projeto_casa_trabalhador(conn: _ConnProxy) -> None:
     conn.execute(
         """
         INSERT INTO projetos (
-            id, nome, descricao, gerente_usuario_id, prazo_conclusao,
+            id, nome, descricao, gerente_usuario_id, inicio_projeto, prazo_conclusao,
             config_json, ativo, criado_em, atualizado_em
-        ) VALUES (?, ?, ?, NULL, ?, ?, 1, ?, ?)
+        ) VALUES (?, ?, ?, NULL, ?, ?, ?, 1, ?, ?)
         """,
         (
             CASA_TRABALHADOR_ID,
             "Casa do Trabalhador",
             "SET / IDT · Acompanhamento gerencial",
+            "2024-07-01",
             "2026-11-26",
             json.dumps(config, ensure_ascii=False),
             now,
@@ -1745,6 +1776,7 @@ def portfolio_for_usuario(usuario: dict) -> list[dict]:
                     "nome": p["nome"],
                     "descricao": p.get("descricao", ""),
                     "gerente_nome": p.get("gerente_nome") or p.get("gerente_usuario") or "",
+                    "inicio_projeto": p.get("inicio_projeto", ""),
                     "prazo_conclusao": p.get("prazo_conclusao", ""),
                     "papel": papeis[p["id"]],
                     "itens": by_proj.get(p["id"], []),
@@ -1803,15 +1835,16 @@ def create_projeto(payload: dict, *, usuario: dict | None = None) -> dict:
         conn.execute(
             """
             INSERT INTO projetos (
-                id, nome, descricao, gerente_usuario_id, prazo_conclusao,
+                id, nome, descricao, gerente_usuario_id, inicio_projeto, prazo_conclusao,
                 config_json, ativo, criado_em, atualizado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
             (
                 slug,
                 nome,
                 (payload.get("descricao") or "").strip(),
                 gerente_id,
+                (payload.get("inicio_projeto") or "").strip(),
                 (payload.get("prazo_conclusao") or "").strip(),
                 json.dumps(config, ensure_ascii=False),
                 now,
@@ -1846,6 +1879,8 @@ def update_projeto(
             fields["nome"] = str(updates["nome"] or "").strip()
         if "descricao" in updates:
             fields["descricao"] = str(updates["descricao"] or "").strip()
+        if "inicio_projeto" in updates:
+            fields["inicio_projeto"] = str(updates["inicio_projeto"] or "").strip()
         if "prazo_conclusao" in updates:
             fields["prazo_conclusao"] = str(updates["prazo_conclusao"] or "").strip()
         if "config" in updates:

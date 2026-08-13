@@ -3,6 +3,7 @@
     form: document.getElementById("projetoForm"),
     projNome: document.getElementById("projNome"),
     projDescricao: document.getElementById("projDescricao"),
+    projInicio: document.getElementById("projInicio"),
     projPrazo: document.getElementById("projPrazo"),
     projGerente: document.getElementById("projGerente"),
     projFormError: document.getElementById("projFormError"),
@@ -17,6 +18,7 @@
     editTitle: document.getElementById("editProjetoTitle"),
     editNome: document.getElementById("editProjetoNome"),
     editDescricao: document.getElementById("editProjetoDescricao"),
+    editInicio: document.getElementById("editProjetoInicio"),
     editPrazo: document.getElementById("editProjetoPrazo"),
     editGerente: document.getElementById("editProjetoGerente"),
     editAtivo: document.getElementById("editProjetoAtivo"),
@@ -144,6 +146,7 @@
           <tr>
             <td class="col-nome"><strong>${escapeHtml(p.nome)}</strong><br><span class="muted">${escapeHtml(p.id)}</span></td>
             <td>${temGerente ? escapeHtml(p.gerente_nome || p.gerente_usuario) : '<span class="muted">Não definido</span>'}</td>
+            <td>${fmtDate(p.inicio_projeto)}</td>
             <td>${fmtDate(p.prazo_conclusao)}</td>
             <td><span class="badge-status ${status}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
             <td>
@@ -240,6 +243,7 @@
     el.editTitle.textContent = projeto.nome;
     el.editNome.value = projeto.nome || "";
     el.editDescricao.value = projeto.descricao || "";
+    if (el.editInicio) el.editInicio.value = (projeto.inicio_projeto || "").slice(0, 10);
     el.editPrazo.value = (projeto.prazo_conclusao || "").slice(0, 10);
     el.editAtivo.value = projeto.ativo ? "1" : "0";
     fillGerenteSelect(el.editGerente, projeto.gerente_usuario_id || "");
@@ -272,6 +276,7 @@
         body: JSON.stringify({
           nome: el.projNome.value.trim(),
           descricao: el.projDescricao.value.trim(),
+          inicio_projeto: el.projInicio ? el.projInicio.value || "" : "",
           prazo_conclusao: el.projPrazo.value || "",
           gerente_usuario_id: el.projGerente.value ? Number(el.projGerente.value) : null,
         }),
@@ -308,6 +313,7 @@
     const payload = {
       nome: el.editNome.value.trim(),
       descricao: el.editDescricao.value.trim(),
+      inicio_projeto: el.editInicio ? el.editInicio.value || "" : "",
       prazo_conclusao: el.editPrazo.value || "",
       ativo: el.editAtivo.value === "1",
       gerente_usuario_id: el.editGerente.value ? Number(el.editGerente.value) : null,

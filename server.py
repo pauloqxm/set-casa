@@ -253,6 +253,7 @@ def painel_response(projeto_id: str = db.CASA_TRABALHADOR_ID) -> dict:
         "descricao": projeto.get("descricao", ""),
         "gerente_usuario_id": projeto.get("gerente_usuario_id"),
         "gerente_nome": projeto.get("gerente_nome") or projeto.get("gerente_usuario") or "",
+        "inicio_projeto": projeto.get("inicio_projeto", ""),
         "prazo_conclusao": projeto.get("prazo_conclusao", ""),
     }
 
@@ -269,6 +270,7 @@ def portfolio_response(user: dict) -> dict:
                 "nome": p["nome"],
                 "descricao": p.get("descricao", ""),
                 "gerente_nome": p.get("gerente_nome") or "",
+                "inicio_projeto": p.get("inicio_projeto", ""),
                 "prazo_conclusao": p.get("prazo_conclusao", ""),
                 "papel": p.get("papel"),
                 "kpis": kpis,

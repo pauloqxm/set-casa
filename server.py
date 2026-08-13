@@ -68,6 +68,16 @@ def is_atrasado(item: dict, today: date) -> bool:
     return bool(prazo and prazo < today)
 
 
+def is_atrasado_mais_de_um_dia(item: dict, today: date | None = None) -> bool:
+    """Prazo vencido há mais de 1 dia (ex.: hoje dia 12, prazo dia 10 ou antes)."""
+    if is_done(item.get("status", "")) or is_na(item.get("status", "")):
+        return False
+    dias = item.get("dias_prazo")
+    if dias is None:
+        dias = days_until(item.get("prazo", ""), today or date.today())
+    return dias is not None and dias < -1
+
+
 def days_until(prazo_value: str, today: date) -> int | None:
     prazo = parse_date(prazo_value)
     if not prazo:
@@ -337,11 +347,15 @@ def tarefas_response(user: dict, query: str = "") -> dict:
             nome, {"nome": nome, "total_abertas": 0, "atrasadas": 0}
         )
         bucket["total_abertas"] += 1
-        if item.get("atrasado"):
+        if is_atrasado_mais_de_um_dia(item):
             bucket["atrasadas"] += 1
-    responsaveis = sorted(
-        resp_map.values(), key=lambda x: (-x["atrasadas"], -x["total_abertas"], x["nome"])
-    )[:5]
+    responsaveis = [
+        r for r in resp_map.values() if r["atrasadas"] > 0
+    ]
+    responsaveis.sort(
+        key=lambda x: (-x["atrasadas"], -x["total_abertas"], x["nome"])
+    )
+    responsaveis = responsaveis[:5]
 
     admin = user.get("papel") == "admin"
     tarefas = []

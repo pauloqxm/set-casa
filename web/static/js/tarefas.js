@@ -319,13 +319,13 @@
               <span class="tarefas-rank-pct">${r.atrasadas}/${r.total_abertas}</span>
             </div>
             ${rankBar(pct, "orange")}
-            <p class="tarefas-rank-meta">${r.atrasadas} atrasada(s) de ${r.total_abertas} aberta(s)</p>
+            <p class="tarefas-rank-meta">${r.atrasadas} tarefa(s) com mais de 1 dia de atraso · ${r.total_abertas} aberta(s) no total</p>
           </div>
         </li>`;
             }
           )
           .join("")
-      : '<li class="tarefas-rank-empty">Nenhum responsável com atrasos.</li>';
+      : '<li class="tarefas-rank-empty">Nenhum responsável com tarefas atrasadas há mais de 1 dia.</li>';
   }
 
   function renderCards(tarefas) {

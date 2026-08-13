@@ -45,14 +45,28 @@
       </header>
 
       <nav class="user-nav" id="userNav" aria-label="Menu">
-        <button type="button" class="btn-ghost btn-small" id="btnVoltar">
-          ← Voltar
+        <button
+          type="button"
+          class="user-nav-toggle"
+          id="userNavToggle"
+          aria-expanded="false"
+          aria-controls="userNavItems"
+        >
+          <span class="user-nav-toggle-label">Menu</span>
+          <span class="user-nav-toggle-icon" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
         </button>
-        <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
-        <a class="btn-ghost btn-small" href="/admin.html">Usuários</a>
-        <button type="button" class="btn-ghost btn-small" id="btnSair">
-          Sair
-        </button>
+        <div class="user-nav-items" id="userNavItems">
+          <button type="button" class="btn-ghost btn-small" id="btnVoltar">
+            ← Voltar
+          </button>
+          <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
+          <a class="btn-ghost btn-small" href="/admin.html">Usuários</a>
+          <button type="button" class="btn-ghost btn-small" id="btnSair">
+            Sair
+          </button>
+        </div>
       </nav>
 
       <main class="wrap admin-wrap">
@@ -197,6 +211,7 @@
       </form>
     </dialog>
 
+    <script src="/static/js/nav-menu.js"></script>
     <script src="/static/js/projetos.js"></script>
   </body>
 </html>

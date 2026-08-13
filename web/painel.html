@@ -88,17 +88,31 @@
       </header>
 
       <nav class="user-nav" id="userNav" aria-label="Menu">
-        <span class="user-chip" id="userChip" hidden>—</span>
-        <button type="button" class="btn-ghost btn-small" id="btnVoltar">
-          ← Voltar
+        <button
+          type="button"
+          class="user-nav-toggle"
+          id="userNavToggle"
+          aria-expanded="false"
+          aria-controls="userNavItems"
+        >
+          <span class="user-nav-toggle-label">Menu</span>
+          <span class="user-nav-toggle-icon" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
         </button>
-        <button type="button" class="btn-ghost btn-small" id="btnEditarProjeto" hidden>
-          Editar título / gerente
-        </button>
-        <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
-        <button type="button" class="btn-ghost btn-small" id="btnSair">
-          Sair
-        </button>
+        <div class="user-nav-items" id="userNavItems">
+          <span class="user-chip" id="userChip" hidden>—</span>
+          <button type="button" class="btn-ghost btn-small" id="btnVoltar">
+            ← Voltar
+          </button>
+          <button type="button" class="btn-ghost btn-small" id="btnEditarProjeto" hidden>
+            Editar título / gerente
+          </button>
+          <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
+          <button type="button" class="btn-ghost btn-small" id="btnSair">
+            Sair
+          </button>
+        </div>
       </nav>
 
       <main class="wrap">
@@ -374,6 +388,7 @@
       </form>
     </dialog>
 
+    <script src="/static/js/nav-menu.js"></script>
     <script src="/static/js/app.js"></script>
   </body>
 </html>

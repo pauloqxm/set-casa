@@ -171,6 +171,71 @@
   border-bottom: 1px solid var(--line);
 }
 
+.user-nav-toggle {
+  display: none;
+  appearance: none;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.user-nav-toggle:hover {
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+
+.user-nav-toggle-icon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 16px;
+}
+
+.user-nav-toggle-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.user-nav.is-open .user-nav-toggle-icon span:nth-child(1) {
+  transform: translateY(5px) rotate(45deg);
+}
+
+.user-nav.is-open .user-nav-toggle-icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.user-nav.is-open .user-nav-toggle-icon span:nth-child(3) {
+  transform: translateY(-5px) rotate(-45deg);
+}
+
+.user-nav-toggle-icon span {
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.user-nav-items {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
 .user-nav a {
   text-decoration: none;
 }
@@ -186,6 +251,48 @@
   font-size: 0.78rem;
   font-weight: 700;
   margin-right: auto;
+}
+
+@media (max-width: 900px) {
+  .user-nav {
+    justify-content: stretch;
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .user-nav-toggle {
+    display: inline-flex;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .user-nav-items {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    padding-top: 4px;
+  }
+
+  .user-nav.is-open .user-nav-items {
+    display: flex;
+  }
+
+  .user-chip {
+    margin-right: 0;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .user-nav-items .btn-ghost,
+  .user-nav-items .btn-run {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 .admin-wrap {

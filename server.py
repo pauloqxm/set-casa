@@ -377,7 +377,7 @@ def tarefas_response(user: dict, query: str = "") -> dict:
             "responsaveis": responsaveis,
         },
         "tarefas": tarefas,
-        "projetos": db.projetos_acessiveis_usuario(user),
+        "projetos": db.projetos_acessiveis_usuario(user, incluir_frentes=True),
         "origens": origens,
         "pode_criar_institucional": admin,
         "status_options": db.DEFAULT_STATUS_OPTIONS,
@@ -590,18 +590,6 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "projetos": db.list_projetos()})
             return
 
-        proj_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
-        if proj_match:
-            projeto_id = proj_match.group(1)
-            if not self._require_projeto_role(projeto_id, "admin"):
-                return
-            projeto = db.get_projeto_public(projeto_id)
-            if not projeto:
-                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
-                return
-            self._send_json({"ok": True, "projeto": projeto})
-            return
-
         proj_frentes_match = re.fullmatch(r"/api/projetos/([^/]+)/frentes", path)
         if proj_frentes_match:
             projeto_id = proj_frentes_match.group(1)
@@ -614,6 +602,18 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(
                 {"ok": True, "frentes": db.frentes_for_projeto(projeto_id)}
             )
+            return
+
+        proj_match = re.fullmatch(r"/api/projetos/([^/]+)", path)
+        if proj_match:
+            projeto_id = proj_match.group(1)
+            if not self._require_projeto_role(projeto_id, "admin"):
+                return
+            projeto = db.get_projeto_public(projeto_id)
+            if not projeto:
+                self._send_json({"ok": False, "erro": "Projeto não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "projeto": projeto})
             return
 
         proj_painel_match = re.fullmatch(r"/api/projetos/([^/]+)/painel", path)

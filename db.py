@@ -1887,7 +1887,9 @@ def _papeis_projetos(conn: _ConnProxy, usuario: dict) -> dict[str, str]:
     }
 
 
-def projetos_acessiveis_usuario(usuario: dict) -> list[dict]:
+def projetos_acessiveis_usuario(
+    usuario: dict, *, incluir_frentes: bool = False
+) -> list[dict]:
     """Projetos visíveis ao usuário (exceto reservatório de tarefas)."""
     with connect() as conn:
         init_db(conn)
@@ -1901,38 +1903,53 @@ def projetos_acessiveis_usuario(usuario: dict) -> list[dict]:
         ]
         out = []
         for p in projetos:
-            out.append(
-                {
-                    "id": p["id"],
-                    "nome": p["nome"],
-                    "papel": papeis[p["id"]],
-                }
-            )
+            entry = {
+                "id": p["id"],
+                "nome": p["nome"],
+                "papel": papeis[p["id"]],
+            }
+            if incluir_frentes:
+                entry["frentes"] = frentes_for_projeto(p["id"], conn)
+            out.append(entry)
         return out
 
 
-def frentes_for_projeto(projeto_id: str) -> list[str]:
-    with connect() as conn:
-        init_db(conn)
-        rows = conn.execute(
-            """
-            SELECT DISTINCT frente FROM itens
-            WHERE projeto_id=? AND TRIM(COALESCE(frente, '')) != ''
-            ORDER BY lower(frente)
-            """,
-            (projeto_id,),
-        ).fetchall()
-        frentes = [r["frente"] for r in rows]
-        projeto = get_projeto(conn, projeto_id)
+def frentes_for_projeto(projeto_id: str, conn: _ConnProxy | None = None) -> list[str]:
+    """Frentes usadas no painel do projeto (itens + config)."""
+
+    def _collect(active: _ConnProxy) -> list[str]:
+        frentes: list[str] = []
+        seen: set[str] = set()
+
+        def add(value: str) -> None:
+            frente = (value or "").strip()
+            if not frente or frente == "Sem frente" or frente in seen:
+                return
+            seen.add(frente)
+            frentes.append(frente)
+
+        for item in list_itens(active, projeto_id):
+            add(item.get("frente", ""))
+
+        projeto = get_projeto(active, projeto_id)
         if projeto:
             try:
                 config = json.loads(projeto.get("config_json") or "{}")
             except json.JSONDecodeError:
                 config = {}
             for frente in (config.get("frente_to_bloco") or {}).keys():
-                if frente and frente not in frentes:
-                    frentes.append(frente)
+                add(frente)
+            for frente in config.get("frentes") or []:
+                add(str(frente))
+
+        frentes.sort(key=lambda x: x.lower())
         return frentes
+
+    if conn is not None:
+        return _collect(conn)
+    with connect() as active:
+        init_db(active)
+        return _collect(active)
 
 
 def list_tarefas_for_usuario(

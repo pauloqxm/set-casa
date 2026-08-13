@@ -48,6 +48,7 @@
     user: null,
     tarefas: [],
     projetos: [],
+    frentesByProjeto: {},
     origens: [],
     statusOptions: [],
     podeCriarInstitucional: false,
@@ -291,20 +292,35 @@
     }
   }
 
-  async function loadFrentes(projetoId) {
-    if (!projetoId) {
-      fillSelectOptions(el.tarefaFrente, [], {
-        includeEmpty: true,
-        emptyLabel: "— Selecione o projeto —",
-      });
-      return;
-    }
-    const data = await api(`/api/projetos/${encodeURIComponent(projetoId)}/frentes`);
-    const frentes = data.frentes || [];
+  function cacheFrentes(projetos) {
+    state.frentesByProjeto = {};
+    (projetos || []).forEach((p) => {
+      if (p.id) state.frentesByProjeto[p.id] = p.frentes || [];
+    });
+  }
+
+  function renderFrenteSelect(frentes, selected = "") {
     fillSelectOptions(el.tarefaFrente, frentes, {
       includeEmpty: true,
-      emptyLabel: frentes.length ? "— Selecione —" : "— Sem frentes —",
+      emptyLabel: frentes.length ? "— Selecione —" : "— Sem frentes cadastradas —",
     });
+    if (selected) el.tarefaFrente.value = selected;
+  }
+
+  async function loadFrentes(projetoId, selected = "") {
+    if (!projetoId) {
+      renderFrenteSelect([]);
+      return;
+    }
+    let frentes = state.frentesByProjeto[projetoId];
+    if (frentes === undefined) {
+      const data = await api(
+        `/api/projetos/${encodeURIComponent(projetoId)}/frentes`
+      );
+      frentes = data.frentes || [];
+      state.frentesByProjeto[projetoId] = frentes;
+    }
+    renderFrenteSelect(frentes, selected);
   }
 
   function openModal(mode, item) {
@@ -312,8 +328,9 @@
     el.modalErro.hidden = true;
     el.modalErro.textContent = "";
     el.modalTitle.textContent = state.editMode ? "Editar tarefa" : "Nova tarefa";
-    el.tarefaId.value = state.editMode ? item.id : "";
+    el.formTarefa.reset();
     el.temProjeto.checked = true;
+    el.tarefaId.value = state.editMode ? item.id : "";
     fillSelectOptions(
       el.tarefaProjeto,
       state.projetos.map((p) => ({ value: p.id, label: p.nome })),
@@ -327,14 +344,16 @@
     fillSelectOptions(el.tarefaStatus, state.statusOptions, {
       includeEmpty: false,
     });
+    el.tarefaStatus.value = "Não iniciado";
+    renderFrenteSelect([]);
 
     if (state.editMode && item) {
       const comProjeto = item.projeto_id !== "set-tarefas";
       el.temProjeto.checked = comProjeto;
       if (comProjeto) {
         el.tarefaProjeto.value = item.projeto_id || "";
-        loadFrentes(item.projeto_id).then(() => {
-          el.tarefaFrente.value = item.frente || "";
+        loadFrentes(item.projeto_id, item.frente || "").catch((err) => {
+          console.error(err);
         });
       } else {
         el.tarefaOrigem.value = item.origem || "";
@@ -346,14 +365,6 @@
       el.tarefaPrioridade.value = item.prioridade || "";
       el.tarefaStatus.value = item.status || "Não iniciado";
       el.tarefaObs.value = item.obs || "";
-    } else {
-      el.formTarefa.reset();
-      el.temProjeto.checked = true;
-      el.tarefaStatus.value = "Não iniciado";
-      fillSelectOptions(el.tarefaFrente, [], {
-        includeEmpty: true,
-        emptyLabel: "— Selecione o projeto —",
-      });
     }
 
     updateModalVisibility();
@@ -368,6 +379,7 @@
     const data = await api(`/api/tarefas${filterQuery()}`);
     state.tarefas = data.tarefas || [];
     state.projetos = data.projetos || [];
+    cacheFrentes(state.projetos);
     state.origens = data.origens || [];
     state.statusOptions = data.status_options || [];
     state.podeCriarInstitucional = !!data.pode_criar_institucional;
@@ -488,8 +500,13 @@
 
   el.temProjeto.addEventListener("change", updateModalVisibility);
 
-  el.tarefaProjeto.addEventListener("change", () => {
-    loadFrentes(el.tarefaProjeto.value).catch((err) => console.error(err));
+  el.formTarefa.addEventListener("change", (event) => {
+    if (event.target !== el.tarefaProjeto) return;
+    loadFrentes(el.tarefaProjeto.value).catch((err) => {
+      console.error(err);
+      el.modalErro.hidden = false;
+      el.modalErro.textContent = err.message || "Erro ao carregar frentes";
+    });
   });
 
   el.formTarefa.addEventListener("submit", salvarTarefa);

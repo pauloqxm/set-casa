@@ -11,6 +11,28 @@
     if (label) label.textContent = open ? "Fechar" : "Menu";
   }
 
+  function markActiveLinks() {
+    const path = (location.pathname || "/").replace(/\/+$/, "") || "/";
+    nav.querySelectorAll("a.btn-ghost").forEach((link) => {
+      let href = link.getAttribute("href") || "";
+      try {
+        href = new URL(href, location.origin).pathname;
+      } catch (_) {}
+      href = href.replace(/\/+$/, "") || "/";
+      const same =
+        href === path ||
+        (href.endsWith(".html") && path === href.replace(/\.html$/, "")) ||
+        (path.endsWith(".html") && href === path.replace(/\.html$/, ""));
+      if (same) {
+        link.setAttribute("aria-current", "page");
+        link.classList.add("is-active");
+      } else {
+        link.removeAttribute("aria-current");
+        link.classList.remove("is-active");
+      }
+    });
+  }
+
   toggle.addEventListener("click", () => {
     setOpen(!nav.classList.contains("is-open"));
   });
@@ -28,4 +50,6 @@
       setOpen(false);
     }
   });
+
+  markActiveLinks();
 })();

@@ -188,11 +188,44 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
+.user-nav .btn-ghost {
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.user-nav .btn-ghost:hover,
 .user-nav-toggle:hover {
-  border-color: var(--green);
-  color: var(--green-dark);
+  border-color: #ed7526;
+  color: #ed7526;
+  background: #fff4ec;
+  transform: translateY(-1px);
+}
+
+.user-nav .btn-ghost:active,
+.user-nav .btn-ghost.is-active,
+.user-nav .btn-ghost[aria-current="page"],
+.user-nav-toggle:active,
+.user-nav.is-open .user-nav-toggle {
+  border-color: #ed7526;
+  background: #ed7526;
+  color: #fff;
+  transform: none;
+}
+
+.user-nav .btn-ghost:focus-visible,
+.user-nav-toggle:focus-visible {
+  outline: 2px solid #ed7526;
+  outline-offset: 2px;
 }
 
 .user-nav-toggle-icon {

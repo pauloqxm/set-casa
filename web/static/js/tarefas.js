@@ -23,6 +23,7 @@
     tarefasCards: document.getElementById("tarefasCards"),
     tarefasEmpty: document.getElementById("tarefasEmpty"),
     tarefasCount: document.getElementById("tarefasCount"),
+    tarefasToast: document.getElementById("tarefasToast"),
     modal: document.getElementById("modalTarefa"),
     formTarefa: document.getElementById("formTarefa"),
     modalTitle: document.getElementById("modalTarefaTitle"),
@@ -61,6 +62,19 @@
   };
 
   const DONE = new Set(["concluído", "concluido"]);
+  let toastTimer = null;
+
+  function showToast(message) {
+    if (!el.tarefasToast || !message) return;
+    el.tarefasToast.textContent = message;
+    el.tarefasToast.hidden = false;
+    requestAnimationFrame(() => el.tarefasToast.classList.add("is-visible"));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.tarefasToast.classList.remove("is-visible");
+      el.tarefasToast.hidden = true;
+    }, 3500);
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -621,6 +635,7 @@
     };
 
     try {
+      const wasNew = !state.editMode;
       if (state.editMode) {
         const id = el.tarefaId.value;
         payload.frente = el.tarefaFrente.value;
@@ -646,6 +661,7 @@
       }
       closeModal();
       await loadTarefas();
+      if (wasNew) showToast("Tarefa salva.");
     } catch (err) {
       el.modalErro.hidden = false;
       el.modalErro.textContent = err.message || "Erro ao salvar";

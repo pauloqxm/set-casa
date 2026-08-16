@@ -41,6 +41,7 @@
     tarefaResponsavel: document.getElementById("tarefaResponsavel"),
     tarefaProxima: document.getElementById("tarefaProxima"),
     tarefaPrazo: document.getElementById("tarefaPrazo"),
+    tarefaPrazoHora: document.getElementById("tarefaPrazoHora"),
     tarefaPrioridade: document.getElementById("tarefaPrioridade"),
     tarefaStatus: document.getElementById("tarefaStatus"),
     tarefaObs: document.getElementById("tarefaObs"),
@@ -337,6 +338,13 @@
       : '<li class="tarefas-rank-empty">Nenhum responsável com tarefas atrasadas há mais de 1 dia.</li>';
   }
 
+  function fmtPrazoCard(item) {
+    const data = fmtDate(item.prazo);
+    const hora = (item.prazo_hora || "").trim();
+    if (!item.prazo) return "—";
+    return hora ? `${data} · ${hora}` : data;
+  }
+
   function renderCards(tarefas) {
     el.tarefasCount.textContent = `${tarefas.length} tarefa(s)`;
     if (!tarefas.length) {
@@ -389,7 +397,7 @@
             <div class="progress" aria-hidden="true"><span style="width:${width}%"></span></div>
             <p class="card-text">
               Resp.: ${escapeHtml(item.responsavel || "—")}
-              <br/>Prazo ${fmtDate(item.prazo)}
+              <br/>Prazo ${escapeHtml(fmtPrazoCard(item))}
               ${item.dias_prazo != null ? `<br/>${item.dias_prazo >= 0 ? `${item.dias_prazo} dia(s) restante(s)` : `${Math.abs(item.dias_prazo)} dia(s) em atraso`}` : ""}
             </p>
             <p class="card-text"><strong>Próxima:</strong> ${escapeHtml(item.proxima || "—")}</p>
@@ -514,6 +522,7 @@
       includeEmpty: false,
     });
     el.tarefaStatus.value = "Não iniciado";
+    el.tarefaPrazoHora.value = "09:00";
     renderFrenteSelect([]);
     fillResponsavelSelect();
 
@@ -532,6 +541,7 @@
       fillResponsavelSelect(item.responsavel_email || "", item.responsavel || "");
       el.tarefaProxima.value = item.proxima || "";
       el.tarefaPrazo.value = item.prazo || "";
+      el.tarefaPrazoHora.value = item.prazo_hora || "09:00";
       el.tarefaPrioridade.value = item.prioridade || "";
       el.tarefaStatus.value = item.status || "Não iniciado";
       el.tarefaObs.value = item.obs || "";
@@ -604,6 +614,7 @@
       entrega: el.tarefaEntrega.value.trim(),
       proxima: el.tarefaProxima.value.trim(),
       prazo: el.tarefaPrazo.value,
+      prazo_hora: el.tarefaPrazoHora.value,
       prioridade: el.tarefaPrioridade.value,
       status: el.tarefaStatus.value,
       obs: el.tarefaObs.value.trim(),

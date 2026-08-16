@@ -80,6 +80,7 @@ ITEM_FIELDS = (
     "parceiros",
     "prioridade",
     "prazo",
+    "prazo_hora",
     "status",
     "pct",
     "proxima",
@@ -98,6 +99,7 @@ EDITABLE_FIELDS = (
     "obs",
     "prioridade",
     "prazo",
+    "prazo_hora",
     "data_mudanca",
     "entrega",
     "frente",
@@ -115,6 +117,7 @@ FIELD_LABELS = {
     "obs": "Observações",
     "prioridade": "Prioridade",
     "prazo": "Prazo",
+    "prazo_hora": "Horário",
     "data_mudanca": "Data da mudança",
     "entrega": "Entrega/Ação",
     "frente": "Frente",
@@ -531,6 +534,7 @@ CREATE TABLE IF NOT EXISTS itens (
     parceiros TEXT NOT NULL DEFAULT '',
     prioridade TEXT NOT NULL DEFAULT '',
     prazo TEXT NOT NULL DEFAULT '',
+    prazo_hora TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT '',
     pct TEXT NOT NULL DEFAULT '',
     proxima TEXT NOT NULL DEFAULT '',
@@ -659,6 +663,7 @@ CREATE TABLE IF NOT EXISTS itens (
     parceiros TEXT NOT NULL DEFAULT '',
     prioridade TEXT NOT NULL DEFAULT '',
     prazo TEXT NOT NULL DEFAULT '',
+    prazo_hora TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT '',
     pct TEXT NOT NULL DEFAULT '',
     proxima TEXT NOT NULL DEFAULT '',
@@ -839,6 +844,10 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             conn.execute(
                 "ALTER TABLE itens ADD COLUMN responsavel_email TEXT NOT NULL DEFAULT ''"
             )
+        if not _has_col("itens", "prazo_hora"):
+            conn.execute(
+                "ALTER TABLE itens ADD COLUMN prazo_hora TEXT NOT NULL DEFAULT ''"
+            )
         conn.execute(
             """
             UPDATE projetos
@@ -883,6 +892,10 @@ def _ensure_columns(conn: _ConnProxy) -> None:
     if "responsavel_email" not in cols:
         conn.execute(
             "ALTER TABLE itens ADD COLUMN responsavel_email TEXT NOT NULL DEFAULT ''"
+        )
+    if "prazo_hora" not in cols:
+        conn.execute(
+            "ALTER TABLE itens ADD COLUMN prazo_hora TEXT NOT NULL DEFAULT ''"
         )
 
     hist_raw = conn._conn.execute("PRAGMA table_info(historico)").fetchall()
@@ -1168,6 +1181,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         values["parceiros"],
         values["prioridade"],
         values["prazo"],
+        values["prazo_hora"],
         values["status"],
         values["pct"],
         values["proxima"],
@@ -1183,12 +1197,12 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         """
         INSERT INTO itens (
             id, frente, entrega, inicio, data_mudanca, nup, responsavel, responsavel_email, parceiros,
-            prioridade, prazo, status, pct, proxima, obs, foto, bloco, bloco_label,
+            prioridade, prazo, prazo_hora, status, pct, proxima, obs, foto, bloco, bloco_label,
             projeto_id, origem, atualizado_em
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?
+            ?, ?, ?, ?
         )
         ON CONFLICT(id) DO UPDATE SET
             frente=excluded.frente,
@@ -1201,6 +1215,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
             parceiros=excluded.parceiros,
             prioridade=excluded.prioridade,
             prazo=excluded.prazo,
+            prazo_hora=excluded.prazo_hora,
             status=excluded.status,
             pct=excluded.pct,
             proxima=excluded.proxima,
@@ -1346,6 +1361,20 @@ def update_item_fields(
         return get_item(conn, item_id)
 
 
+def _normalize_prazo_hora(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", raw)
+    if not m:
+        return ""
+    hour = int(m.group(1))
+    minute = int(m.group(2))
+    if hour > 23 or minute > 59:
+        return ""
+    return f"{hour:02d}:{minute:02d}"
+
+
 def create_item(
     payload: dict,
     *,
@@ -1373,6 +1402,7 @@ def create_item(
             "parceiros": (payload.get("parceiros") or "").strip(),
             "prioridade": (payload.get("prioridade") or "").strip(),
             "prazo": (payload.get("prazo") or "").strip(),
+            "prazo_hora": _normalize_prazo_hora(payload.get("prazo_hora")),
             "status": (payload.get("status") or "Não iniciado").strip(),
             "pct": str(payload.get("pct") or "").strip(),
             "proxima": (payload.get("proxima") or "").strip(),

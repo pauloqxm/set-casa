@@ -76,5 +76,7 @@ Com as variáveis do Supabase definidas no ambiente, o mesmo código usa Postgre
    - `GMAIL_USER=tarefas@trabalho.ce.gov.br`
    - `GMAIL_APP_PASSWORD=` (16 caracteres, sem espaços)
    - `APP_BASE_URL=` URL pública do serviço (ex.: `https://seu-app.up.railway.app`)
-3. Ao criar tarefa em `/tarefas.html`, o responsável (lista da planilha) recebe e-mail automático.
-4. Falhas de envio ficam registradas na tabela `notificacoes_tarefa` (a tarefa é criada mesmo se o e-mail falhar).
+3. Ao criar tarefa em `/tarefas.html`, o responsável recebe e-mail com **convite de agenda** (.ics) quando houver prazo + horário.
+4. No Gmail, o responsável deve aceitar o convite (**Sim** / **Adicionar ao calendário**) para o evento entrar no Google Agenda.
+5. **Google Tasks automático** na conta do responsável exige configuração extra no Admin Workspace (Service Account + delegação). O convite de agenda é a integração suportada hoje.
+6. Falhas de envio ficam registradas na tabela `notificacoes_tarefa`.

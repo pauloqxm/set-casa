@@ -11,7 +11,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY server.py db.py storage.py import_xlsx.py ./
+COPY server.py db.py storage.py import_xlsx.py responsaveis.py notifications.py ./
 COPY web/ ./web/
 COPY data/painel.json ./data/painel.json
 

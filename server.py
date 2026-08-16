@@ -13,6 +13,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 import db
+import notifications
+import responsaveis
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
@@ -586,6 +588,21 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/portfolio":
             user = self._current_user()
             self._send_json(portfolio_response(user))
+            return
+
+        if path == "/api/tarefas/responsaveis":
+            user = self._current_user()
+            if not user:
+                return
+            try:
+                items = responsaveis.list_responsaveis()
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "erro": f"Não foi possível carregar responsáveis: {exc}"},
+                    502,
+                )
+                return
+            self._send_json({"ok": True, "responsaveis": items})
             return
 
         if path == "/api/tarefas":
@@ -1163,6 +1180,12 @@ class Handler(SimpleHTTPRequestHandler):
                 created.get("origem") or db.ORIGEM_PROJETO, ""
             )
             item["pode_editar"] = db.pode_editar_tarefa(user, created)
+            notifications.notify_nova_tarefa(
+                created,
+                user,
+                projeto_nome=item["projeto_nome"],
+                origem_label=item["origem_label"],
+            )
             self._send_json({"ok": True, "tarefa": item}, status=201)
             return
 

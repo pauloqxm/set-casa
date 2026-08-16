@@ -31,7 +31,13 @@ Política sugerida do bucket (privado; o backend usa service role):
 | `SUPABASE_STORAGE_BUCKET` | não | default `fotos-acoes` |
 | `COOKIE_SECURE` | não | default `1` em produção |
 | `ADMIN_USER` / `ADMIN_PASS` | recomendado | seed do primeiro admin |
+| `GMAIL_USER` | sim* | remetente (`tarefas@trabalho.ce.gov.br`) |
+| `GMAIL_APP_PASSWORD` | sim* | senha de app Google (sem espaços) |
+| `APP_BASE_URL` | sim* | URL pública do Railway (links no e-mail) |
+| `RESPONSAVEIS_SHEET_URL` | não | CSV publicado da lista de responsáveis |
 | `PORT` | automático | Railway injeta |
+
+\* Obrigatórias para envio de e-mail ao cadastrar tarefa.
 
 4. Faça o deploy. Healthcheck: `GET /api/health`.
 
@@ -62,3 +68,13 @@ iniciar.bat
 ```
 
 Com as variáveis do Supabase definidas no ambiente, o mesmo código usa Postgres + Storage.
+
+## 6. E-mail ao cadastrar tarefa
+
+1. Na conta `tarefas@trabalho.ce.gov.br`, ative **verificação em 2 etapas** e gere uma **senha de app** (Google Account → Segurança → Senhas de app).
+2. Configure no Railway:
+   - `GMAIL_USER=tarefas@trabalho.ce.gov.br`
+   - `GMAIL_APP_PASSWORD=` (16 caracteres, sem espaços)
+   - `APP_BASE_URL=` URL pública do serviço (ex.: `https://seu-app.up.railway.app`)
+3. Ao criar tarefa em `/tarefas.html`, o responsável (lista da planilha) recebe e-mail automático.
+4. Falhas de envio ficam registradas na tabela `notificacoes_tarefa` (a tarefa é criada mesmo se o e-mail falhar).

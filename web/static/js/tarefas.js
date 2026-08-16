@@ -53,6 +53,7 @@
     frentesByProjeto: {},
     origens: [],
     statusOptions: [],
+    responsaveis: [],
     podeCriarInstitucional: false,
     editMode: false,
     editingItem: null,
@@ -419,6 +420,30 @@
     }
   }
 
+  function fillResponsavelSelect(selectedEmail = "", selectedNome = "") {
+    fillSelectOptions(
+      el.tarefaResponsavel,
+      state.responsaveis.map((r) => ({ value: r.email, label: r.nome })),
+      { includeEmpty: true, emptyLabel: "— Selecione —" }
+    );
+    if (
+      selectedEmail &&
+      [...el.tarefaResponsavel.options].some((o) => o.value === selectedEmail)
+    ) {
+      el.tarefaResponsavel.value = selectedEmail;
+      return;
+    }
+    if (selectedNome) {
+      const match = state.responsaveis.find((r) => r.nome === selectedNome);
+      if (match) el.tarefaResponsavel.value = match.email;
+    }
+  }
+
+  async function loadResponsaveis() {
+    const data = await api("/api/tarefas/responsaveis");
+    state.responsaveis = data.responsaveis || [];
+  }
+
   function updateModalVisibility() {
     const comProjeto = el.temProjeto.checked;
     el.blocoProjeto.hidden = !comProjeto;
@@ -490,6 +515,7 @@
     });
     el.tarefaStatus.value = "Não iniciado";
     renderFrenteSelect([]);
+    fillResponsavelSelect();
 
     if (state.editMode && item) {
       const comProjeto = item.projeto_id !== "set-tarefas";
@@ -503,7 +529,7 @@
         el.tarefaOrigem.value = item.origem || "";
       }
       el.tarefaEntrega.value = item.entrega || "";
-      el.tarefaResponsavel.value = item.responsavel || "";
+      fillResponsavelSelect(item.responsavel_email || "", item.responsavel || "");
       el.tarefaProxima.value = item.proxima || "";
       el.tarefaPrazo.value = item.prazo || "";
       el.tarefaPrioridade.value = item.prioridade || "";
@@ -576,7 +602,6 @@
     el.modalErro.hidden = true;
     const payload = {
       entrega: el.tarefaEntrega.value.trim(),
-      responsavel: el.tarefaResponsavel.value.trim(),
       proxima: el.tarefaProxima.value.trim(),
       prazo: el.tarefaPrazo.value,
       prioridade: el.tarefaPrioridade.value,
@@ -594,6 +619,9 @@
         });
       } else {
         payload.tem_projeto = el.temProjeto.checked;
+        const respOpt = el.tarefaResponsavel.selectedOptions[0];
+        payload.responsavel_email = el.tarefaResponsavel.value.trim();
+        payload.responsavel = respOpt ? respOpt.textContent.trim() : "";
         if (payload.tem_projeto) {
           payload.projeto_id = el.tarefaProjeto.value;
           payload.frente = el.tarefaFrente.value;
@@ -715,6 +743,7 @@
 
   initDefaultFilters();
   loadMe()
+    .then(loadResponsaveis)
     .then(loadTarefas)
     .catch((err) => {
       console.error(err);

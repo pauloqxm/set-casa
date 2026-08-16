@@ -76,6 +76,7 @@ ITEM_FIELDS = (
     "data_mudanca",
     "nup",
     "responsavel",
+    "responsavel_email",
     "parceiros",
     "prioridade",
     "prazo",
@@ -526,6 +527,7 @@ CREATE TABLE IF NOT EXISTS itens (
     data_mudanca TEXT NOT NULL DEFAULT '',
     nup TEXT NOT NULL DEFAULT '',
     responsavel TEXT NOT NULL DEFAULT '',
+    responsavel_email TEXT NOT NULL DEFAULT '',
     parceiros TEXT NOT NULL DEFAULT '',
     prioridade TEXT NOT NULL DEFAULT '',
     prazo TEXT NOT NULL DEFAULT '',
@@ -625,6 +627,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_projeto ON audit_log(projeto_id, criado_em);
+
+CREATE TABLE IF NOT EXISTS notificacoes_tarefa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'email',
+    destinatario TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT '',
+    detalhes TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_tarefa_item ON notificacoes_tarefa(item_id, criado_em);
 """
 
 SCHEMA_POSTGRES = """
@@ -641,6 +655,7 @@ CREATE TABLE IF NOT EXISTS itens (
     data_mudanca TEXT NOT NULL DEFAULT '',
     nup TEXT NOT NULL DEFAULT '',
     responsavel TEXT NOT NULL DEFAULT '',
+    responsavel_email TEXT NOT NULL DEFAULT '',
     parceiros TEXT NOT NULL DEFAULT '',
     prioridade TEXT NOT NULL DEFAULT '',
     prazo TEXT NOT NULL DEFAULT '',
@@ -740,6 +755,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_projeto ON audit_log(projeto_id, criado_em);
+
+CREATE TABLE IF NOT EXISTS notificacoes_tarefa (
+    id SERIAL PRIMARY KEY,
+    item_id TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'email',
+    destinatario TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT '',
+    detalhes TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_tarefa_item ON notificacoes_tarefa(item_id, criado_em);
 """
 
 
@@ -808,6 +835,10 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo)")
+        if not _has_col("itens", "responsavel_email"):
+            conn.execute(
+                "ALTER TABLE itens ADD COLUMN responsavel_email TEXT NOT NULL DEFAULT ''"
+            )
         conn.execute(
             """
             UPDATE projetos
@@ -849,6 +880,10 @@ def _ensure_columns(conn: _ConnProxy) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_projeto ON itens(projeto_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_origem ON itens(origem)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_prazo ON itens(prazo)")
+    if "responsavel_email" not in cols:
+        conn.execute(
+            "ALTER TABLE itens ADD COLUMN responsavel_email TEXT NOT NULL DEFAULT ''"
+        )
 
     hist_raw = conn._conn.execute("PRAGMA table_info(historico)").fetchall()
     hist_cols = {row[1] for row in hist_raw}
@@ -1129,6 +1164,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
         values["data_mudanca"],
         values["nup"],
         values["responsavel"],
+        values["responsavel_email"],
         values["parceiros"],
         values["prioridade"],
         values["prazo"],
@@ -1146,11 +1182,11 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
     conn.execute(
         """
         INSERT INTO itens (
-            id, frente, entrega, inicio, data_mudanca, nup, responsavel, parceiros,
+            id, frente, entrega, inicio, data_mudanca, nup, responsavel, responsavel_email, parceiros,
             prioridade, prazo, status, pct, proxima, obs, foto, bloco, bloco_label,
             projeto_id, origem, atualizado_em
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?
         )
@@ -1161,6 +1197,7 @@ def upsert_item(conn: _ConnProxy, item: dict, touch: bool = True) -> None:
             data_mudanca=excluded.data_mudanca,
             nup=excluded.nup,
             responsavel=excluded.responsavel,
+            responsavel_email=excluded.responsavel_email,
             parceiros=excluded.parceiros,
             prioridade=excluded.prioridade,
             prazo=excluded.prazo,
@@ -1332,6 +1369,7 @@ def create_item(
             "data_mudanca": data_mudanca,
             "nup": (payload.get("nup") or "").strip(),
             "responsavel": (payload.get("responsavel") or "").strip(),
+            "responsavel_email": (payload.get("responsavel_email") or "").strip().lower(),
             "parceiros": (payload.get("parceiros") or "").strip(),
             "prioridade": (payload.get("prioridade") or "").strip(),
             "prazo": (payload.get("prazo") or "").strip(),
@@ -2042,6 +2080,9 @@ def list_tarefas_for_usuario(
 
 
 def create_tarefa(payload: dict, *, usuario: dict | None = None) -> dict:
+    import responsaveis
+
+    payload = responsaveis.apply_responsavel_payload(payload)
     tem_projeto = payload.get("tem_projeto")
     if tem_projeto is None:
         tem_projeto = bool((payload.get("projeto_id") or "").strip())
@@ -2076,6 +2117,33 @@ def pode_editar_tarefa(usuario: dict | None, item: dict) -> bool:
     if projeto_id == TAREFAS_GERAIS_ID:
         return usuario.get("papel") == "admin"
     return pode_editar_projeto(usuario, projeto_id)
+
+
+def log_notificacao_tarefa(
+    item_id: str,
+    tipo: str,
+    destinatario: str,
+    status: str,
+    detalhes: str = "",
+) -> None:
+    with connect() as conn:
+        init_db(conn)
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            """
+            INSERT INTO notificacoes_tarefa (
+                item_id, tipo, destinatario, status, detalhes, criado_em
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item_id,
+                tipo,
+                destinatario,
+                status,
+                (detalhes or "")[:2000],
+                now,
+            ),
+        )
 
 
 def get_projeto(conn: _ConnProxy, projeto_id: str) -> dict | None:

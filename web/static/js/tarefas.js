@@ -37,9 +37,15 @@
     rowTemProjeto: document.getElementById("rowTemProjeto"),
     tarefaProjeto: document.getElementById("tarefaProjeto"),
     tarefaFrente: document.getElementById("tarefaFrente"),
+    btnNovaFrente: document.getElementById("btnNovaFrente"),
+    frenteNovaWrap: document.getElementById("frenteNovaWrap"),
+    frenteNovaInput: document.getElementById("frenteNovaInput"),
+    btnConfirmarFrente: document.getElementById("btnConfirmarFrente"),
+    btnCancelarFrente: document.getElementById("btnCancelarFrente"),
     tarefaOrigem: document.getElementById("tarefaOrigem"),
     tarefaEntrega: document.getElementById("tarefaEntrega"),
     tarefaResponsavel: document.getElementById("tarefaResponsavel"),
+    tarefaParceiros: document.getElementById("tarefaParceiros"),
     tarefaProxima: document.getElementById("tarefaProxima"),
     tarefaPrazo: document.getElementById("tarefaPrazo"),
     tarefaPrazoHora: document.getElementById("tarefaPrazoHora"),
@@ -475,6 +481,7 @@
       el.temProjeto.checked = true;
       el.blocoOrigem.hidden = true;
     }
+    updateFrenteControls();
     if (el.btnExcluirTarefa) {
       el.btnExcluirTarefa.hidden = !(
         state.editMode && state.editingItem && state.editingItem.pode_editar
@@ -495,6 +502,66 @@
       emptyLabel: frentes.length ? "— Selecione —" : "— Sem frentes cadastradas —",
     });
     if (selected) el.tarefaFrente.value = selected;
+    updateFrenteControls();
+  }
+
+  function updateFrenteControls() {
+    const projetoId = el.tarefaProjeto.value;
+    const comProjeto = el.temProjeto.checked && !el.blocoProjeto.hidden;
+    const showNova = comProjeto && !!projetoId;
+    if (el.btnNovaFrente) el.btnNovaFrente.hidden = !showNova;
+    if (!showNova) hideNovaFrenteForm();
+  }
+
+  function hideNovaFrenteForm() {
+    if (el.frenteNovaWrap) el.frenteNovaWrap.hidden = true;
+    if (el.frenteNovaInput) el.frenteNovaInput.value = "";
+  }
+
+  function addFrenteToSelect(nome, projetoId) {
+    const trimmed = String(nome || "").trim();
+    if (!trimmed) return false;
+    const frentes = state.frentesByProjeto[projetoId] || [];
+    if (!frentes.some((f) => f.toLowerCase() === trimmed.toLowerCase())) {
+      frentes.push(trimmed);
+      frentes.sort((a, b) => a.localeCompare(b, "pt-BR"));
+      state.frentesByProjeto[projetoId] = frentes;
+    }
+    renderFrenteSelect(frentes, trimmed);
+    return true;
+  }
+
+  function showNovaFrenteForm() {
+    if (!el.tarefaProjeto.value) {
+      el.modalErro.hidden = false;
+      el.modalErro.textContent = "Selecione o projeto antes de cadastrar uma frente.";
+      return;
+    }
+    el.modalErro.hidden = true;
+    if (el.frenteNovaWrap) el.frenteNovaWrap.hidden = false;
+    if (el.frenteNovaInput) {
+      el.frenteNovaInput.value = "";
+      el.frenteNovaInput.focus();
+    }
+  }
+
+  function confirmNovaFrente() {
+    const projetoId = el.tarefaProjeto.value;
+    const nome = el.frenteNovaInput.value.trim();
+    if (!projetoId) {
+      el.modalErro.hidden = false;
+      el.modalErro.textContent = "Selecione o projeto.";
+      return;
+    }
+    if (!nome) {
+      el.modalErro.hidden = false;
+      el.modalErro.textContent = "Informe o nome da frente.";
+      el.frenteNovaInput.focus();
+      return;
+    }
+    el.modalErro.hidden = true;
+    addFrenteToSelect(nome, projetoId);
+    hideNovaFrenteForm();
   }
 
   async function loadFrentes(projetoId, selected = "") {
@@ -539,6 +606,8 @@
     el.tarefaPrazoHora.value = "09:00";
     renderFrenteSelect([]);
     fillResponsavelSelect();
+    if (el.tarefaParceiros) el.tarefaParceiros.value = "";
+    hideNovaFrenteForm();
 
     if (state.editMode && item) {
       const comProjeto = item.projeto_id !== "set-tarefas";
@@ -553,6 +622,7 @@
       }
       el.tarefaEntrega.value = item.entrega || "";
       fillResponsavelSelect(item.responsavel_email || "", item.responsavel || "");
+      if (el.tarefaParceiros) el.tarefaParceiros.value = item.parceiros || "";
       el.tarefaProxima.value = item.proxima || "";
       el.tarefaPrazo.value = item.prazo || "";
       el.tarefaPrazoHora.value = item.prazo_hora || "09:00";
@@ -627,6 +697,7 @@
     const payload = {
       entrega: el.tarefaEntrega.value.trim(),
       proxima: el.tarefaProxima.value.trim(),
+      parceiros: el.tarefaParceiros ? el.tarefaParceiros.value.trim() : "",
       prazo: el.tarefaPrazo.value,
       prazo_hora: el.tarefaPrazoHora.value,
       prioridade: el.tarefaPrioridade.value,
@@ -716,10 +787,33 @@
 
   el.filtroOrigem.addEventListener("change", updateFilterVisibility);
 
-  el.temProjeto.addEventListener("change", updateModalVisibility);
+  el.temProjeto.addEventListener("change", () => {
+    updateModalVisibility();
+    updateFrenteControls();
+  });
+
+  if (el.btnNovaFrente) {
+    el.btnNovaFrente.addEventListener("click", showNovaFrenteForm);
+  }
+  if (el.btnConfirmarFrente) {
+    el.btnConfirmarFrente.addEventListener("click", confirmNovaFrente);
+  }
+  if (el.btnCancelarFrente) {
+    el.btnCancelarFrente.addEventListener("click", hideNovaFrenteForm);
+  }
+  if (el.frenteNovaInput) {
+    el.frenteNovaInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        confirmNovaFrente();
+      }
+      if (event.key === "Escape") hideNovaFrenteForm();
+    });
+  }
 
   el.formTarefa.addEventListener("change", (event) => {
     if (event.target !== el.tarefaProjeto) return;
+    hideNovaFrenteForm();
     loadFrentes(el.tarefaProjeto.value).catch((err) => {
       console.error(err);
       el.modalErro.hidden = false;

@@ -230,11 +230,36 @@
             Projeto
             <select id="tarefaProjeto" name="projeto_id"></select>
           </label>
-          <label>
+          <label class="tarefa-frente-field">
             Frente
-            <select id="tarefaFrente" name="frente">
-              <option value="">— Selecione o projeto —</option>
-            </select>
+            <div class="tarefa-field-row">
+              <select id="tarefaFrente" name="frente">
+                <option value="">— Selecione o projeto —</option>
+              </select>
+              <button
+                type="button"
+                class="btn-ghost btn-small"
+                id="btnNovaFrente"
+                title="Cadastrar nova frente"
+                hidden
+              >
+                + Nova frente
+              </button>
+            </div>
+            <div class="tarefa-frente-nova" id="frenteNovaWrap" hidden>
+              <input
+                type="text"
+                id="frenteNovaInput"
+                placeholder="Ex.: Sensibilização"
+                autocomplete="off"
+              />
+              <button type="button" class="btn-run btn-small" id="btnConfirmarFrente">
+                Adicionar
+              </button>
+              <button type="button" class="btn-ghost btn-small" id="btnCancelarFrente">
+                Cancelar
+              </button>
+            </div>
           </label>
         </div>
         <div id="blocoOrigem" hidden>
@@ -247,12 +272,23 @@
           Entrega / título
           <input type="text" id="tarefaEntrega" name="entrega" required />
         </label>
-        <label>
-          Responsável
-          <select id="tarefaResponsavel" name="responsavel_email" required>
-            <option value="">— Selecione —</option>
-          </select>
-        </label>
+        <div class="dialog-dates">
+          <label>
+            Responsável
+            <select id="tarefaResponsavel" name="responsavel_email" required>
+              <option value="">— Selecione —</option>
+            </select>
+          </label>
+          <label>
+            Parceiros
+            <input
+              type="text"
+              id="tarefaParceiros"
+              name="parceiros"
+              placeholder="Ex.: ENEL, KG/SOP"
+            />
+          </label>
+        </div>
         <label>
           Próxima providência
           <textarea id="tarefaProxima" name="proxima" rows="2"></textarea>

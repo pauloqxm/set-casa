@@ -371,6 +371,44 @@ a.tarefas-rank-title:hover {
   font-size: 0.72rem;
 }
 
+.tarefa-frente-field .tarefa-field-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.tarefa-frente-field .tarefa-field-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tarefa-frente-field .tarefa-field-row .btn-small {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.tarefa-frente-nova {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed #c5d0d8;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.tarefa-frente-nova input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+}
+
 @media (max-width: 900px) {
   .tarefas-kpis-fluxo,
   .tarefas-kpis-atencao {

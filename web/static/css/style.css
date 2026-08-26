@@ -117,11 +117,21 @@ textarea {
   flex-shrink: 0;
 }
 
+.top-progress-rings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .ring-num {
   font-size: 14px;
   font-weight: 800;
   fill: var(--green);
   font-family: var(--font);
+}
+
+.ring-num-time {
+  fill: #0d9488;
 }
 
 .ring-label {

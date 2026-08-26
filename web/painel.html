@@ -45,39 +45,74 @@
             </div>
           </div>
           <div class="top-progress">
-            <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
-              <circle
-                cx="42"
-                cy="42"
-                r="34"
-                fill="none"
-                stroke="#e4e4e4"
-                stroke-width="8"
-              />
-              <circle
-                id="ringProgress"
-                cx="42"
-                cy="42"
-                r="34"
-                fill="none"
-                stroke="#39b54a"
-                stroke-width="8"
-                stroke-linecap="round"
-                transform="rotate(-90 42 42)"
-              />
-              <text
-                x="42"
-                y="40"
-                text-anchor="middle"
-                class="ring-num"
-                id="ringPct"
-              >
-                0%
-              </text>
-              <text x="42" y="54" text-anchor="middle" class="ring-label">
-                CONCLUÍDO
-              </text>
-            </svg>
+            <div class="top-progress-rings">
+              <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+                <circle
+                  cx="42"
+                  cy="42"
+                  r="34"
+                  fill="none"
+                  stroke="#e4e4e4"
+                  stroke-width="8"
+                />
+                <circle
+                  id="ringTimeProgress"
+                  cx="42"
+                  cy="42"
+                  r="34"
+                  fill="none"
+                  stroke="#0d9488"
+                  stroke-width="8"
+                  stroke-linecap="round"
+                  transform="rotate(-90 42 42)"
+                />
+                <text
+                  x="42"
+                  y="40"
+                  text-anchor="middle"
+                  class="ring-num ring-num-time"
+                  id="ringTimePct"
+                >
+                  —
+                </text>
+                <text x="42" y="54" text-anchor="middle" class="ring-label">
+                  TEMPO
+                </text>
+              </svg>
+              <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true">
+                <circle
+                  cx="42"
+                  cy="42"
+                  r="34"
+                  fill="none"
+                  stroke="#e4e4e4"
+                  stroke-width="8"
+                />
+                <circle
+                  id="ringProgress"
+                  cx="42"
+                  cy="42"
+                  r="34"
+                  fill="none"
+                  stroke="#39b54a"
+                  stroke-width="8"
+                  stroke-linecap="round"
+                  transform="rotate(-90 42 42)"
+                />
+                <text
+                  x="42"
+                  y="40"
+                  text-anchor="middle"
+                  class="ring-num"
+                  id="ringPct"
+                >
+                  0%
+                </text>
+                <text x="42" y="54" text-anchor="middle" class="ring-label">
+                  CONCLUÍDO
+                </text>
+              </svg>
+            </div>
             <div class="inaug-meta">
               <span class="eyebrow" id="prazoLabel">Prazo</span>
               <strong id="prazoData">—</strong>
@@ -109,7 +144,6 @@
             Editar título / gerente
           </button>
           <a class="btn-ghost btn-small" href="/portfolio.html">Portfólio</a>
-          <a class="btn-ghost btn-small" href="/tarefas.html">Tarefas</a>
           <button type="button" class="btn-ghost btn-small" id="btnSair">
             Sair
           </button>

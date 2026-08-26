@@ -129,6 +129,8 @@
     diasInaug: document.getElementById("diasInaug"),
     ringProgress: document.getElementById("ringProgress"),
     ringPct: document.getElementById("ringPct"),
+    ringTimeProgress: document.getElementById("ringTimeProgress"),
+    ringTimePct: document.getElementById("ringTimePct"),
     filterStatus: document.getElementById("filterStatus"),
     filterPrioridade: document.getElementById("filterPrioridade"),
     filterResponsavel: document.getElementById("filterResponsavel"),
@@ -383,17 +385,60 @@
     fillSelect(el.filterResponsavel, resps, "Todos");
   }
 
+  function setProgressRing(circle, pct) {
+    if (!circle) return;
+    const r = 34;
+    const circ = 2 * Math.PI * r;
+    const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+    circle.setAttribute("stroke-dasharray", String(circ));
+    circle.setAttribute(
+      "stroke-dashoffset",
+      String(circ - (circ * clamped) / 100)
+    );
+    return clamped;
+  }
+
+  function resolveTempoPct() {
+    if (state.kpis.tempo_pct != null && state.kpis.tempo_pct !== "") {
+      return Number(state.kpis.tempo_pct);
+    }
+    const inicio = parseItemDate(
+      state.projetoMeta.inicio_projeto || state.kpis.inicio_projeto || ""
+    );
+    const fim = parseItemDate(
+      IS_LEGACY_HOME
+        ? state.kpis.inauguracao || "2026-11-26"
+        : state.projetoMeta.prazo_conclusao || state.kpis.prazo_conclusao || ""
+    );
+    const hoje = parseItemDate(state.kpis.hoje || "") || new Date();
+    if (!inicio || !fim || fim <= inicio) return null;
+    const start = new Date(inicio);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(fim);
+    end.setHours(0, 0, 0, 0);
+    hoje.setHours(0, 0, 0, 0);
+    const span = end.getTime() - start.getTime();
+    if (span <= 0) return null;
+    const decorridos = hoje.getTime() - start.getTime();
+    return Math.round(Math.max(0, Math.min(100, (decorridos / span) * 100)));
+  }
+
   function renderRing() {
     if (!el.ringProgress || !el.ringPct) return;
     const pct = Number(state.kpis.progresso_pct || 0);
-    const r = 34;
-    const circ = 2 * Math.PI * r;
-    el.ringProgress.setAttribute("stroke-dasharray", String(circ));
-    el.ringProgress.setAttribute(
-      "stroke-dashoffset",
-      String(circ - (circ * Math.max(0, Math.min(100, pct))) / 100)
-    );
-    el.ringPct.textContent = `${pct}%`;
+    const shown = setProgressRing(el.ringProgress, pct);
+    el.ringPct.textContent = `${shown}%`;
+
+    const tempoPct = resolveTempoPct();
+    if (el.ringTimeProgress && el.ringTimePct) {
+      if (tempoPct == null) {
+        setProgressRing(el.ringTimeProgress, 0);
+        el.ringTimePct.textContent = "—";
+      } else {
+        const tempoShown = setProgressRing(el.ringTimeProgress, tempoPct);
+        el.ringTimePct.textContent = `${tempoShown}%`;
+      }
+    }
 
     const dias =
       state.kpis.dias_para_conclusao !== undefined && !IS_LEGACY_HOME

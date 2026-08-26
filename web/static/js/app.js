@@ -440,10 +440,9 @@
       }
     }
 
-    const dias =
-      state.kpis.dias_para_conclusao !== undefined && !IS_LEGACY_HOME
-        ? state.kpis.dias_para_conclusao
-        : state.kpis.dias_para_inauguracao;
+    const dias = IS_LEGACY_HOME
+      ? (state.kpis.dias_para_inauguracao ?? state.kpis.dias_para_conclusao)
+      : (state.kpis.dias_para_conclusao ?? state.kpis.dias_para_inauguracao);
     if (!el.diasInaug) return;
     if (dias == null) {
       el.diasInaug.textContent = "—";

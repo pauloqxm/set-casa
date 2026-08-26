@@ -146,6 +146,9 @@ def compute_kpis(
     if prazo_conclusao is not None:
         base["prazo_conclusao"] = prazo_conclusao.isoformat()
         base["dias_para_conclusao"] = (prazo_conclusao - today).days
+        if prazo_conclusao == INAUGURACAO:
+            base["inauguracao"] = INAUGURACAO.isoformat()
+            base["dias_para_inauguracao"] = base["dias_para_conclusao"]
     else:
         # Compatibilidade: painel legado da Casa do Trabalhador sempre expôs
         # estes dois campos com o nome "inauguração".

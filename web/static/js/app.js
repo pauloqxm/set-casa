@@ -1448,7 +1448,7 @@
   function openCreate() {
     el.editMode.value = "create";
     el.editId.value = "";
-    el.editEyebrow.textContent = "Nova ação";
+    el.editEyebrow.textContent = "Nova tarefa";
     el.editTitle.textContent = "Incluir nova entrega no monitoramento";
     el.editSubmit.textContent = "Incluir ação";
     el.editDelete.style.display = "none";

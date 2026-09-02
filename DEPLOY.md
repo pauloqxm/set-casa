@@ -17,6 +17,27 @@ Política sugerida do bucket (privado; o backend usa service role):
 - não é necessário liberar acesso público anônimo;
 - o painel serve fotos autenticadas via `GET /api/fotos/...`.
 
+### Segurança — alertas do Supabase (RLS)
+
+O SET Projetos **não usa** o cliente JavaScript do Supabase no navegador. O Railway
+conecta ao Postgres com `DATABASE_URL` e ao Storage com `SUPABASE_SERVICE_ROLE_KEY`
+(somente no servidor).
+
+Mesmo assim, o Supabase expõe por padrão as tabelas do schema `public` na API REST
+(`/rest/v1/...`). Se **Row Level Security (RLS)** estiver desligado, qualquer pessoa
+com a URL do projeto e a chave `anon` pode ler/alterar dados — incluindo
+`usuarios.senha_hash`, `sessoes.token` e `responsavel_email`.
+
+**Correção recomendada (não quebra o app):**
+
+1. Supabase → **SQL Editor** → executar [`supabase/enable_rls.sql`](supabase/enable_rls.sql).
+2. Isso ativa RLS em todas as tabelas **sem** políticas públicas → API anon bloqueada.
+3. A conexão Postgres do Railway (`postgres` / service role) continua com acesso total.
+4. Confirme que o bucket `fotos-acoes` está **Private** (Storage → bucket → Settings).
+5. **Nunca** coloque `SUPABASE_SERVICE_ROLE_KEY` nem `anon` key no frontend.
+
+Após rodar o script, os alertas de RLS devem sumir em até 24 h.
+
 ## 2. Railway
 
 1. Crie um serviço a partir do repositório Git.

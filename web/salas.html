@@ -91,32 +91,38 @@
           <div class="kpis" id="kpis"></div>
         </section>
 
-        <section class="panel" aria-label="Agenda">
-          <div class="panel-head panel-head-row">
-            <div>
+        <section class="panel salas-agenda-panel" aria-label="Agenda">
+          <div class="salas-grade-head">
+            <div class="salas-grade-block is-week">
+              <span class="salas-grade-label">Agenda</span>
               <h2>Grade semanal</h2>
               <p id="semanaLabel">—</p>
             </div>
-            <div class="salas-week-nav">
+            <div class="salas-grade-block is-local">
               <label class="salas-local-filter">
-                Local
+                <span class="salas-grade-label">Local</span>
                 <select id="filtroLocal" aria-label="Escolha de locais">
                   <option value="">Todos os locais</option>
                 </select>
               </label>
-              <button type="button" class="btn-ghost btn-small" id="btnSemanaAnt">
-                ← Semana
-              </button>
-              <button type="button" class="btn-ghost btn-small" id="btnHoje">Hoje</button>
-              <input
-                type="date"
-                id="irParaData"
-                class="salas-date-visible"
-                aria-label="Ir para um dia específico"
-              />
-              <button type="button" class="btn-ghost btn-small" id="btnSemanaProx">
-                Semana →
-              </button>
+            </div>
+            <div class="salas-grade-block is-nav">
+              <span class="salas-grade-label">Período</span>
+              <div class="salas-week-nav">
+                <button type="button" class="btn-ghost btn-small" id="btnSemanaAnt">
+                  ← Semana
+                </button>
+                <button type="button" class="btn-ghost btn-small" id="btnHoje">Hoje</button>
+                <input
+                  type="date"
+                  id="irParaData"
+                  class="salas-date-visible"
+                  aria-label="Ir para um dia específico"
+                />
+                <button type="button" class="btn-ghost btn-small" id="btnSemanaProx">
+                  Semana →
+                </button>
+              </div>
             </div>
           </div>
           <div class="salas-days" id="diasTabs" role="tablist"></div>

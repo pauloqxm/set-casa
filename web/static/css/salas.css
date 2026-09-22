@@ -41,6 +41,68 @@
   }
 }
 
+.salas-agenda-panel {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.salas-grade-head {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(200px, 0.9fr) minmax(280px, 1.3fr);
+  gap: 2px;
+  margin: 0 -12px 14px;
+  background: #1d4a28;
+}
+
+.salas-grade-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 88px;
+  padding: 14px 18px;
+  color: #fff;
+}
+
+.salas-grade-block.is-week {
+  background: var(--green);
+}
+
+.salas-grade-block.is-local {
+  background: var(--blue);
+}
+
+.salas-grade-block.is-nav {
+  background: var(--orange);
+}
+
+.salas-grade-label {
+  display: block;
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.salas-grade-block h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.salas-grade-block p,
+.salas-grade-block #semanaLabel {
+  margin: 0;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .salas-week-nav {
   display: flex;
   flex-wrap: wrap;
@@ -49,37 +111,65 @@
 }
 
 .salas-local-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--ink-soft);
+  color: #fff;
 }
 
 .salas-local-filter select,
-.salas-date-visible {
+.salas-date-visible,
+.salas-grade-head .btn-ghost {
   appearance: none;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--ink);
-  background: var(--white);
-  border: 1px solid var(--line);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 7px 12px;
   min-height: 34px;
   cursor: pointer;
 }
 
 .salas-local-filter select {
-  min-width: 180px;
-  max-width: 240px;
+  width: 100%;
+  max-width: 260px;
+}
+
+.salas-local-filter select option {
+  color: var(--ink);
+  background: var(--white);
 }
 
 .salas-date-visible {
   padding: 6px 10px;
+  color-scheme: dark;
+}
+
+.salas-date-visible::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.salas-grade-head .btn-ghost:hover,
+.salas-local-filter select:hover,
+.salas-date-visible:hover {
+  background: rgba(255, 255, 255, 0.26);
+  color: #fff;
+}
+
+@media (max-width: 860px) {
+  .salas-grade-head {
+    grid-template-columns: 1fr;
+  }
+
+  .salas-grade-block {
+    min-height: 0;
+  }
 }
 
 .salas-days {

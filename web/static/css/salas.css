@@ -1,3 +1,46 @@
+.salas-kpis-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.salas-kpis-row .kpi-card {
+  padding: 8px 10px 7px;
+  gap: 2px;
+}
+
+.salas-kpis-row .kpi-label {
+  font-size: 0.6rem;
+}
+
+.salas-kpis-row .kpi-value {
+  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.salas-kpis-row .kpi-text {
+  font-size: 0.66rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.salas-kpis-row .kpi-foot {
+  padding-top: 4px;
+  font-size: 0.62rem;
+}
+
+.salas-kpis-row .tarefas-kpi-bar {
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .salas-kpis-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .salas-week-nav {
   display: flex;
   flex-wrap: wrap;

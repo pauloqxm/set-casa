@@ -171,7 +171,7 @@
         tone: "teal",
         head: "Ocupação",
         value: `${ocup}%`,
-        text: "Slots das salas ativas · dias úteis",
+        text: "Slots · dias úteis",
         status: "Grade 8h–17h",
         bar: ocup,
       },
@@ -179,14 +179,14 @@
         tone: "green",
         head: "Sala mais usada",
         value: sala ? sala.nome : "—",
-        text: sala ? `${sala.total} reserva(s)` : "Sem reservas na semana",
+        text: sala ? `${sala.total} reserva(s)` : "Sem reservas",
         status: "Uso",
       },
       {
         tone: "orange",
         head: "Horário de pico",
         value: pico ? pico.hora : "—",
-        text: pico ? `${pico.total} reserva(s) neste início` : "Sem pico",
+        text: pico ? `${pico.total} reserva(s)` : "Sem pico",
         status: "Demanda",
       },
     ];
@@ -194,7 +194,7 @@
       <div class="kpi-groups">
         <div class="kpi-group">
           <p class="kpi-group-label">Semana selecionada</p>
-          <div class="kpis-row tarefas-kpis-fluxo">${cards
+          <div class="kpis-row salas-kpis-row">${cards
             .map(
               (c) => `
             <article class="kpi-card kpi-${c.tone}">

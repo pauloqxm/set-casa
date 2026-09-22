@@ -5,23 +5,18 @@
   gap: 8px;
 }
 
-.salas-date-jump {
-  position: relative;
-  display: inline-flex;
-  align-items: stretch;
-}
-
-.salas-date-jump .btn-ghost {
-  pointer-events: none;
-}
-
-.salas-date-overlay {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+.salas-date-visible {
+  appearance: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  min-height: 34px;
   cursor: pointer;
-  border: 0;
-  background: transparent;
 }
 
 .salas-days {

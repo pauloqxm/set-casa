@@ -12,6 +12,7 @@
     btnSemanaAnt: document.getElementById("btnSemanaAnt"),
     btnSemanaProx: document.getElementById("btnSemanaProx"),
     btnHoje: document.getElementById("btnHoje"),
+    btnCalendario: document.getElementById("btnCalendario"),
     irParaData: document.getElementById("irParaData"),
     diasTabs: document.getElementById("diasTabs"),
     grade: document.getElementById("grade"),
@@ -521,6 +522,23 @@
     loadAgenda().catch((err) => console.error(err));
   }
 
+  function abrirCalendario() {
+    if (!el.irParaData) return;
+    el.irParaData.value = state.selectedDate;
+    el.irParaData.focus();
+    if (typeof el.irParaData.showPicker === "function") {
+      try {
+        el.irParaData.showPicker();
+        return;
+      } catch {
+        /* o campo visível continua clicável */
+      }
+    }
+  }
+
+  if (el.btnCalendario) {
+    el.btnCalendario.addEventListener("click", abrirCalendario);
+  }
   if (el.irParaData) {
     el.irParaData.addEventListener("change", () => irParaDia(el.irParaData.value));
   }

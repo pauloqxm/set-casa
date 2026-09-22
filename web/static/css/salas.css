@@ -186,6 +186,13 @@
   opacity: 0.55;
 }
 
+.salas-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .salas-admin-item strong {
   display: block;
 }

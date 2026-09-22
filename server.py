@@ -673,15 +673,17 @@ class Handler(SimpleHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json({"ok": False, "erro": str(exc)}, 400)
                 return
+            pode_gerenciar = bool(user and db.pode_editar(user.get("papel", "")))
             self._send_json(
                 {
                     "ok": True,
                     "agendamentos": agendamentos,
-                    "salas": ativas,
+                    "salas": salas if pode_gerenciar else ativas,
                     "coordenacoes": db.list_coordenacoes(),
                     "kpis": kpis,
                     "slots": [{"inicio": a, "fim": b} for a, b in db.SLOTS_AGENDA],
                     "pode_admin": user.get("papel") == "admin" if user else False,
+                    "pode_gerenciar": pode_gerenciar,
                 }
             )
             return
@@ -690,7 +692,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._require_postgres():
                 return
             user = self._current_user()
-            todas = user and user.get("papel") == "admin"
+            todas = bool(user and db.pode_editar(user.get("papel", "")))
             try:
                 salas = db.list_salas(somente_ativas=not todas)
             except ValueError as exc:
@@ -989,7 +991,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         sala_match = re.fullmatch(r"/api/salas/([^/]+)", path)
         if sala_match:
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             try:
                 body = self._read_json()
@@ -1008,7 +1010,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         coord_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
         if coord_match:
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             try:
                 body = self._read_json()
@@ -1196,7 +1198,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         sala_del_match = re.fullmatch(r"/api/salas/([^/]+)", path)
         if sala_del_match:
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             if not db.delete_sala(sala_del_match.group(1), usuario=self._current_user()):
                 self._send_json({"ok": False, "erro": "Sala não encontrada"}, 404)
@@ -1206,7 +1208,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         coord_del_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
         if coord_del_match:
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             try:
                 if not db.delete_coordenacao(
@@ -1407,7 +1409,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/salas":
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             try:
                 body = self._read_json()
@@ -1423,7 +1425,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/coordenacoes":
-            if not self._require_postgres() or not self._require_admin():
+            if not self._require_postgres() or not self._require_editor():
                 return
             try:
                 body = self._read_json()

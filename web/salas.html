@@ -128,9 +128,10 @@
         <section class="panel admin-panel" id="adminSalas" hidden>
           <div class="panel-head">
             <h2>Cadastro de salas</h2>
-            <p>Visível apenas para administradores</p>
+            <p>Administrador e editor podem cadastrar e editar</p>
           </div>
           <form id="formSala" class="admin-form">
+            <input type="hidden" id="salaId" value="" />
             <div class="admin-form-grid">
               <label>
                 Nome
@@ -155,7 +156,10 @@
               </label>
             </div>
             <div class="dialog-actions-right admin-form-actions">
-              <button type="submit" class="btn-run btn-small">Salvar sala</button>
+              <button type="button" class="btn-ghost btn-small" id="btnCancelarSala" hidden>
+                Cancelar edição
+              </button>
+              <button type="submit" class="btn-run btn-small" id="btnSalvarSala">Salvar sala</button>
             </div>
           </form>
           <div class="salas-admin-list" id="listaSalas"></div>
@@ -167,6 +171,7 @@
             <p>Padroniza a sigla usada nos agendamentos e nos indicadores</p>
           </div>
           <form id="formCoord" class="admin-form">
+            <input type="hidden" id="coordId" value="" />
             <div class="admin-form-grid">
               <label>
                 Sigla
@@ -178,7 +183,12 @@
               </label>
             </div>
             <div class="dialog-actions-right admin-form-actions">
-              <button type="submit" class="btn-run btn-small">Salvar coordenação</button>
+              <button type="button" class="btn-ghost btn-small" id="btnCancelarCoord" hidden>
+                Cancelar edição
+              </button>
+              <button type="submit" class="btn-run btn-small" id="btnSalvarCoord">
+                Salvar coordenação
+              </button>
             </div>
           </form>
           <div class="salas-admin-list" id="listaCoords"></div>

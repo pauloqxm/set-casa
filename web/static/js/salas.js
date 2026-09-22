@@ -19,14 +19,20 @@
     adminSalas: document.getElementById("adminSalas"),
     adminCoords: document.getElementById("adminCoords"),
     formSala: document.getElementById("formSala"),
+    salaId: document.getElementById("salaId"),
     salaNome: document.getElementById("salaNome"),
     salaAndar: document.getElementById("salaAndar"),
     salaCapacidade: document.getElementById("salaCapacidade"),
     salaRecursos: document.getElementById("salaRecursos"),
+    btnCancelarSala: document.getElementById("btnCancelarSala"),
+    btnSalvarSala: document.getElementById("btnSalvarSala"),
     listaSalas: document.getElementById("listaSalas"),
     formCoord: document.getElementById("formCoord"),
+    coordId: document.getElementById("coordId"),
     coordSigla: document.getElementById("coordSigla"),
     coordNome: document.getElementById("coordNome"),
+    btnCancelarCoord: document.getElementById("btnCancelarCoord"),
+    btnSalvarCoord: document.getElementById("btnSalvarCoord"),
     listaCoords: document.getElementById("listaCoords"),
     modal: document.getElementById("modalAgenda"),
     formAgenda: document.getElementById("formAgenda"),
@@ -55,6 +61,7 @@
     coordenacoes: [],
     agendamentos: [],
     podeAdmin: false,
+    podeGerenciar: false,
   };
 
   let toastTimer = null;
@@ -299,7 +306,7 @@
   }
 
   function renderAdmin() {
-    const show = state.podeAdmin;
+    const show = state.podeGerenciar;
     el.adminSalas.hidden = !show;
     el.adminCoords.hidden = !show;
     if (!show) return;
@@ -313,9 +320,14 @@
             s.capacidade != null ? `${s.capacidade} lugares` : "capacidade —"
           } · ${(s.recursos || []).join(", ") || "sem recursos"}</span>
         </div>
-        <button type="button" class="btn-ghost btn-small" data-del-sala="${escapeAttr(
-          s.id
-        )}">${s.ativo ? "Desativar" : "Excluir"}</button>
+        <div class="salas-admin-actions">
+          <button type="button" class="btn-ghost btn-small" data-edit-sala="${escapeAttr(
+            s.id
+          )}">Editar</button>
+          <button type="button" class="btn-ghost btn-small" data-del-sala="${escapeAttr(
+            s.id
+          )}">${s.ativo ? "Desativar" : "Excluir"}</button>
+        </div>
       </div>`
       )
       .join("");
@@ -327,9 +339,14 @@
           <strong>${escapeHtml(c.sigla)}</strong>
           <span>${escapeHtml(c.nome_completo || "—")}</span>
         </div>
-        <button type="button" class="btn-ghost btn-small" data-del-coord="${escapeAttr(
-          c.id
-        )}">Excluir</button>
+        <div class="salas-admin-actions">
+          <button type="button" class="btn-ghost btn-small" data-edit-coord="${escapeAttr(
+            c.id
+          )}">Editar</button>
+          <button type="button" class="btn-ghost btn-small" data-del-coord="${escapeAttr(
+            c.id
+          )}">Excluir</button>
+        </div>
       </div>`
       )
       .join("");
@@ -384,6 +401,7 @@
     state.agendamentos = data.agendamentos || [];
     state.slots = data.slots || [];
     state.podeAdmin = !!data.pode_admin;
+    state.podeGerenciar = !!data.pode_gerenciar || state.podeAdmin;
     if (!state.slots.length) {
       state.slots = [
         { inicio: "08:00", fim: "09:00" },
@@ -534,20 +552,64 @@
     el.irParaData.addEventListener("change", () => irParaDia(el.irParaData.value));
   }
 
+  function resetSalaForm() {
+    el.formSala.reset();
+    if (el.salaId) el.salaId.value = "";
+    if (el.btnCancelarSala) el.btnCancelarSala.hidden = true;
+    if (el.btnSalvarSala) el.btnSalvarSala.textContent = "Salvar sala";
+  }
+
+  function resetCoordForm() {
+    el.formCoord.reset();
+    if (el.coordId) el.coordId.value = "";
+    if (el.btnCancelarCoord) el.btnCancelarCoord.hidden = true;
+    if (el.btnSalvarCoord) el.btnSalvarCoord.textContent = "Salvar coordenação";
+  }
+
+  function preencherSala(sala) {
+    el.salaId.value = sala.id;
+    el.salaNome.value = sala.nome || "";
+    el.salaAndar.value = sala.andar || "";
+    el.salaCapacidade.value = sala.capacidade ?? "";
+    el.salaRecursos.value = (sala.recursos || []).join(", ");
+    el.btnCancelarSala.hidden = false;
+    el.btnSalvarSala.textContent = "Atualizar sala";
+    el.salaNome.focus();
+  }
+
+  function preencherCoord(coord) {
+    el.coordId.value = coord.id;
+    el.coordSigla.value = coord.sigla || "";
+    el.coordNome.value = coord.nome_completo || "";
+    el.btnCancelarCoord.hidden = false;
+    el.btnSalvarCoord.textContent = "Atualizar coordenação";
+    el.coordSigla.focus();
+  }
+
   el.formSala.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const payload = {
+      nome: el.salaNome.value.trim(),
+      andar: el.salaAndar.value.trim(),
+      capacidade: el.salaCapacidade.value,
+      recursos: el.salaRecursos.value,
+    };
+    const id = el.salaId.value;
     try {
-      await api("/api/salas", {
-        method: "POST",
-        body: JSON.stringify({
-          nome: el.salaNome.value.trim(),
-          andar: el.salaAndar.value.trim(),
-          capacidade: el.salaCapacidade.value,
-          recursos: el.salaRecursos.value,
-        }),
-      });
-      el.formSala.reset();
-      showToast("Sala cadastrada.");
+      if (id) {
+        await api(`/api/salas/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+        showToast("Sala atualizada.");
+      } else {
+        await api("/api/salas", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        showToast("Sala cadastrada.");
+      }
+      resetSalaForm();
       await loadAgenda();
     } catch (err) {
       window.alert(err.message || "Erro ao salvar sala");
@@ -556,23 +618,46 @@
 
   el.formCoord.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const payload = {
+      sigla: el.coordSigla.value.trim(),
+      nome_completo: el.coordNome.value.trim(),
+    };
+    const id = el.coordId.value;
     try {
-      await api("/api/coordenacoes", {
-        method: "POST",
-        body: JSON.stringify({
-          sigla: el.coordSigla.value.trim(),
-          nome_completo: el.coordNome.value.trim(),
-        }),
-      });
-      el.formCoord.reset();
-      showToast("Coordenação cadastrada.");
+      if (id) {
+        await api(`/api/coordenacoes/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+        showToast("Coordenação atualizada.");
+      } else {
+        await api("/api/coordenacoes", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        showToast("Coordenação cadastrada.");
+      }
+      resetCoordForm();
       await loadAgenda();
     } catch (err) {
       window.alert(err.message || "Erro ao salvar coordenação");
     }
   });
 
+  if (el.btnCancelarSala) {
+    el.btnCancelarSala.addEventListener("click", resetSalaForm);
+  }
+  if (el.btnCancelarCoord) {
+    el.btnCancelarCoord.addEventListener("click", resetCoordForm);
+  }
+
   el.listaSalas.addEventListener("click", async (event) => {
+    const editBtn = event.target.closest("[data-edit-sala]");
+    if (editBtn) {
+      const sala = state.salas.find((s) => s.id === editBtn.dataset.editSala);
+      if (sala) preencherSala(sala);
+      return;
+    }
     const btn = event.target.closest("[data-del-sala]");
     if (!btn) return;
     if (!window.confirm("Desativar ou excluir esta sala?")) return;
@@ -587,6 +672,12 @@
   });
 
   el.listaCoords.addEventListener("click", async (event) => {
+    const editBtn = event.target.closest("[data-edit-coord]");
+    if (editBtn) {
+      const coord = state.coordenacoes.find((c) => c.id === editBtn.dataset.editCoord);
+      if (coord) preencherCoord(coord);
+      return;
+    }
     const btn = event.target.closest("[data-del-coord]");
     if (!btn) return;
     if (!window.confirm("Excluir esta coordenação?")) return;

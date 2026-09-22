@@ -67,6 +67,7 @@
   function papelLabel(papel) {
     if (papel === "admin") return "Administrador";
     if (papel === "editor") return "Editor";
+    if (papel === "reservas") return "Reservas";
     return "Consulta";
   }
 

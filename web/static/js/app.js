@@ -1503,6 +1503,10 @@
       location.replace("/login.html");
       return;
     }
+    if (user.papel === "reservas") {
+      location.replace("/salas.html");
+      return;
+    }
     state.user = user;
     if (el.userChip) {
       el.userChip.hidden = false;

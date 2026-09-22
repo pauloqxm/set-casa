@@ -28,6 +28,7 @@
   function papelLabel(papel) {
     if (papel === "admin") return "Administrador";
     if (papel === "editor") return "Editor";
+    if (papel === "reservas") return "Reservas";
     return "Consulta";
   }
 
@@ -56,6 +57,10 @@
     const user = data.usuario;
     if (!user) {
       location.replace("/login.html");
+      return;
+    }
+    if (user.papel === "reservas") {
+      location.replace("/salas.html");
       return;
     }
     if (el.userChip) {

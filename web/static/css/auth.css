@@ -417,6 +417,11 @@
   color: var(--ink-soft);
 }
 
+.badge-papel.reservas {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
 .badge-papel.usuario {
   background: var(--green-soft);
   color: var(--green-dark);

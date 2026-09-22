@@ -52,4 +52,19 @@
   });
 
   markActiveLinks();
+
+  fetch("/api/me", { cache: "no-store" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data || !data.usuario || data.usuario.papel !== "reservas") return;
+      nav.querySelectorAll("a.btn-ghost").forEach((link) => {
+        const href = link.getAttribute("href") || "";
+        if (!/salas(\.html)?$/i.test(href.replace(/\/+$/, ""))) {
+          link.hidden = true;
+        }
+      });
+      const voltar = document.getElementById("btnVoltar");
+      if (voltar) voltar.hidden = true;
+    })
+    .catch(() => {});
 })();

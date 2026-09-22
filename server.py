@@ -507,6 +507,26 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
         return None
 
+    def _home_for_user(self, user: dict | None) -> str:
+        return db.home_for_user(user)
+
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+    def _restrict_reservas_page(self, user: dict | None, path: str) -> bool:
+        """Redireciona o perfil Reservas para /salas.html fora dessa aba."""
+        if not db.usuario_somente_salas(user):
+            return False
+        if path.startswith("/api/") or path.startswith("/static/"):
+            return False
+        if path in ("/salas", "/salas.html"):
+            return False
+        self._redirect("/salas.html")
+        return True
+
     def _require_postgres(self) -> bool:
         if db.USE_POSTGRES:
             return True
@@ -615,6 +635,8 @@ class Handler(SimpleHTTPRequestHandler):
                 user = self._require_user()
             if not user:
                 return
+            if self._restrict_reservas_page(user, path):
+                return
 
         if path == "/api/painel":
             self._send_json(painel_response())
@@ -685,6 +707,9 @@ class Handler(SimpleHTTPRequestHandler):
                     "slots": [{"inicio": a, "fim": b} for a, b in db.SLOTS_AGENDA],
                     "pode_admin": user.get("papel") == "admin" if user else False,
                     "pode_gerenciar": pode_gerenciar,
+                    "pode_reservar": bool(
+                        user and db.pode_reservar(user.get("papel", ""))
+                    ),
                 }
             )
             return
@@ -907,10 +932,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self.path = "/painel.html"
         elif path == "/login.html" and self._current_user():
-            self.send_response(302)
-            self.send_header("Location", "/portfolio.html")
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
+            self._redirect(self._home_for_user(self._current_user()))
             return
         return super().do_GET()
 

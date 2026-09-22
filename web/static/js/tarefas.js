@@ -678,6 +678,10 @@
       location.replace("/login.html");
       return;
     }
+    if (state.user.papel === "reservas") {
+      location.replace("/salas.html");
+      return;
+    }
     if (el.userChip) {
       el.userChip.hidden = false;
       const papel = state.user.papel_label || state.user.papel || "";

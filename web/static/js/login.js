@@ -12,7 +12,9 @@
       if (!res.ok) return;
       const data = await res.json();
       if (data.usuario) {
-        location.replace("/portfolio.html");
+        location.replace(
+          data.usuario.papel === "reservas" ? "/salas.html" : "/portfolio.html"
+        );
       }
     } catch (_) {}
   }
@@ -43,7 +45,11 @@
         error.hidden = false;
         return;
       }
-      location.replace("/portfolio.html");
+      location.replace(
+        data.usuario && data.usuario.papel === "reservas"
+          ? "/salas.html"
+          : "/portfolio.html"
+      );
     } catch (_) {
       error.textContent = "Falha de conexão com o servidor.";
       error.hidden = false;

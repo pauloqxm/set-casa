@@ -88,14 +88,16 @@
   }
 
   function papelLabel(papel) {
-    if (papel === "admin") return "Admin";
+    if (papel === "admin") return "Administrador";
     if (papel === "consulta") return "Consulta";
+    if (papel === "reservas") return "Reservas";
     return "Editor";
   }
 
   function papelClass(papel) {
     if (papel === "admin") return "admin";
     if (papel === "consulta") return "consulta";
+    if (papel === "reservas") return "reservas";
     return "editor";
   }
 

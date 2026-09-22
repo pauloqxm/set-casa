@@ -135,11 +135,13 @@ SESSION_DAYS = 7
 DEFAULT_ADMIN_USER = os.environ.get("ADMIN_USER", "admin").strip() or "admin"
 DEFAULT_ADMIN_PASS = os.environ.get("ADMIN_PASS", "admin123").strip() or "admin123"
 
-PAPEIS = ("admin", "editor", "consulta")
+PAPEIS = ("admin", "editor", "consulta", "reservas")
+PAPEIS_PROJETO = ("admin", "editor", "consulta")
 PAPEL_LABELS = {
     "admin": "Administrador",
     "editor": "Editor",
     "consulta": "Consulta",
+    "reservas": "Reservas",
 }
 
 # Projeto legado: todo dado existente antes do portfólio pertence a ele.
@@ -1066,6 +1068,8 @@ def _seed_usuario_projetos_inicial(conn: _ConnProxy) -> None:
             papel = normalize_papel(u.get("papel") or "consulta")
         except ValueError:
             papel = "consulta"
+        if papel == "reservas":
+            continue
         now = datetime.now().isoformat(timespec="seconds")
         conn.execute(
             """
@@ -1691,12 +1695,17 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def normalize_papel(papel: str) -> str:
+def normalize_papel(papel: str, *, projeto: bool = False) -> str:
     value = (papel or "").strip().casefold()
     if value == "usuario":
         return "editor"
-    if value not in PAPEIS:
-        raise ValueError("Papel inválido (use admin, editor ou consulta)")
+    allowed = PAPEIS_PROJETO if projeto else PAPEIS
+    if value not in allowed:
+        raise ValueError(
+            "Papel inválido (use admin, editor, consulta ou reservas)"
+            if not projeto
+            else "Papel de projeto inválido (use admin, editor ou consulta)"
+        )
     return value
 
 
@@ -1705,6 +1714,23 @@ def pode_editar(papel: str) -> bool:
         return normalize_papel(papel) in ("admin", "editor")
     except ValueError:
         return False
+
+
+def pode_reservar(papel: str) -> bool:
+    try:
+        return normalize_papel(papel) in ("admin", "reservas")
+    except ValueError:
+        return False
+
+
+def usuario_somente_salas(usuario: dict | None) -> bool:
+    return bool(usuario and usuario.get("papel") == "reservas")
+
+
+def home_for_user(usuario: dict | None) -> str:
+    if usuario_somente_salas(usuario):
+        return "/salas.html"
+    return "/portfolio.html"
 
 
 def _user_public(row: Any) -> dict:
@@ -1716,6 +1742,7 @@ def _user_public(row: Any) -> dict:
     except ValueError:
         data["papel"] = "consulta"
     data["pode_editar"] = pode_editar(data["papel"])
+    data["pode_reservar"] = pode_reservar(data["papel"])
     data["papel_label"] = PAPEL_LABELS.get(data["papel"], data["papel"])
     return data
 
@@ -2450,7 +2477,7 @@ def delete_projeto(projeto_id: str, *, usuario: dict | None = None) -> bool:
 def _set_usuario_projeto(
     conn: _ConnProxy, usuario_id: int, projeto_id: str, papel: str
 ) -> None:
-    papel = normalize_papel(papel)
+    papel = normalize_papel(papel, projeto=True)
     now = datetime.now().isoformat(timespec="seconds")
     conn.execute(
         """
@@ -2480,7 +2507,7 @@ def set_usuario_projeto(
             entidade_id=str(usuario_id),
             acao="conceder_acesso",
             usuario=usuario,
-            detalhes={"papel": normalize_papel(papel)},
+            detalhes={"papel": normalize_papel(papel, projeto=True)},
             conn=conn,
         )
 
@@ -2793,16 +2820,10 @@ def _agendamento_public(row: Any, *, usuario: dict | None = None) -> dict:
 
 
 def pode_editar_agendamento(usuario: dict | None, item: dict) -> bool:
-    """Só o autor da reserva ou um administrador global pode editar/cancelar."""
+    """Somente o perfil Reservas ou um administrador pode editar/cancelar."""
     if not usuario or not item:
         return False
-    if usuario.get("papel") == "admin":
-        return True
-    autor_id = item.get("usuario_id")
-    user_id = usuario.get("id")
-    if autor_id in (None, "") or user_id in (None, ""):
-        return False
-    return str(user_id) == str(autor_id)
+    return pode_reservar(usuario.get("papel", ""))
 
 
 def _tem_conflito(
@@ -3374,6 +3395,10 @@ def create_agendamento(payload: dict, *, usuario: dict | None = None) -> dict:
     require_postgres()
     if not usuario or not usuario.get("id"):
         raise ValueError("Usuário não autenticado")
+    if not pode_reservar(usuario.get("papel", "")):
+        raise ValueError(
+            "Somente o perfil Reservas ou um administrador pode criar agendamentos"
+        )
     sala_id = (payload.get("sala_id") or "").strip()
     if not sala_id:
         raise ValueError("Selecione a sala")

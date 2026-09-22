@@ -507,6 +507,18 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
         return None
 
+    def _require_postgres(self) -> bool:
+        if db.USE_POSTGRES:
+            return True
+        self._send_json(
+            {
+                "ok": False,
+                "erro": "Agendamento de salas exige o Postgres do Supabase (DATABASE_URL).",
+            },
+            503,
+        )
+        return False
+
     def _require_admin(self) -> dict | None:
         user = self._require_user()
         if not user:
@@ -636,6 +648,64 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": "Sem projetos acessíveis"}, 403)
                 return
             self._send_json(tarefas_response(user, parsed.query))
+            return
+
+        if path == "/api/agendamentos":
+            if not self._require_postgres():
+                return
+            user = self._current_user()
+            params = parse_qs(parsed.query or "")
+
+            def qp(key: str, default: str = "") -> str:
+                vals = params.get(key, [])
+                return (vals[0] if vals else default).strip()
+
+            try:
+                de = qp("de")
+                ate = qp("ate")
+                sala_id = qp("sala_id")
+                agendamentos = db.list_agendamentos(
+                    de=de, ate=ate, sala_id=sala_id, usuario=user
+                )
+                salas = db.list_salas(somente_ativas=False)
+                ativas = [s for s in salas if s.get("ativo")]
+                kpis = db.compute_agendamento_kpis(agendamentos, ativas, de, ate)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "agendamentos": agendamentos,
+                    "salas": ativas,
+                    "coordenacoes": db.list_coordenacoes(),
+                    "kpis": kpis,
+                    "slots": [{"inicio": a, "fim": b} for a, b in db.SLOTS_AGENDA],
+                    "pode_admin": user.get("papel") == "admin" if user else False,
+                }
+            )
+            return
+
+        if path == "/api/salas":
+            if not self._require_postgres():
+                return
+            user = self._current_user()
+            todas = user and user.get("papel") == "admin"
+            try:
+                salas = db.list_salas(somente_ativas=not todas)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "salas": salas})
+            return
+
+        if path == "/api/coordenacoes":
+            if not self._require_postgres():
+                return
+            try:
+                self._send_json({"ok": True, "coordenacoes": db.list_coordenacoes()})
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
             return
 
         if path == "/api/projetos":
@@ -793,6 +863,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.path = "/admin.html"
         elif path in ("/portfolio", "/portfolio.html"):
             self.path = "/portfolio.html"
+        elif path in ("/salas", "/salas.html"):
+            self.path = "/salas.html"
         elif path in ("/tarefas", "/tarefas.html"):
             user = self._current_user()
             if not db.projetos_acessiveis_usuario(user) and user.get("papel") != "admin":
@@ -891,6 +963,67 @@ class Handler(SimpleHTTPRequestHandler):
             if not user:
                 return
             return self._patch_item(projeto_id, item_id, user)
+
+        agenda_match = re.fullmatch(r"/api/agendamentos/([^/]+)", path)
+        if agenda_match:
+            if not self._require_postgres():
+                return
+            user = self._require_user()
+            if not user:
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                updated = db.update_agendamento(
+                    agenda_match.group(1), body, usuario=user
+                )
+            except ValueError as exc:
+                status = 403 if "permissão" in str(exc).lower() else 400
+                self._send_json({"ok": False, "erro": str(exc)}, status)
+                return
+            self._send_json({"ok": True, "agendamento": updated})
+            return
+
+        sala_match = re.fullmatch(r"/api/salas/([^/]+)", path)
+        if sala_match:
+            if not self._require_postgres() or not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                updated = db.update_sala(
+                    sala_match.group(1), body, usuario=self._current_user()
+                )
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "sala": updated})
+            return
+
+        coord_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
+        if coord_match:
+            if not self._require_postgres() or not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                updated = db.update_coordenacao(
+                    coord_match.group(1), body, usuario=self._current_user()
+                )
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "coordenacao": updated})
+            return
 
         if not self._require_editor():
             return
@@ -1043,6 +1176,48 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": "Tarefa não encontrada"}, 404)
                 return
             self._send_json({"ok": True, "removido": item_id})
+            return
+
+        agenda_del_match = re.fullmatch(r"/api/agendamentos/([^/]+)", path)
+        if agenda_del_match:
+            if not self._require_postgres():
+                return
+            user = self._require_user()
+            if not user:
+                return
+            try:
+                updated = db.cancel_agendamento(agenda_del_match.group(1), usuario=user)
+            except ValueError as exc:
+                status = 403 if "permissão" in str(exc).lower() else 400
+                self._send_json({"ok": False, "erro": str(exc)}, status)
+                return
+            self._send_json({"ok": True, "agendamento": updated})
+            return
+
+        sala_del_match = re.fullmatch(r"/api/salas/([^/]+)", path)
+        if sala_del_match:
+            if not self._require_postgres() or not self._require_admin():
+                return
+            if not db.delete_sala(sala_del_match.group(1), usuario=self._current_user()):
+                self._send_json({"ok": False, "erro": "Sala não encontrada"}, 404)
+                return
+            self._send_json({"ok": True, "removido": sala_del_match.group(1)})
+            return
+
+        coord_del_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
+        if coord_del_match:
+            if not self._require_postgres() or not self._require_admin():
+                return
+            try:
+                if not db.delete_coordenacao(
+                    coord_del_match.group(1), usuario=self._current_user()
+                ):
+                    self._send_json({"ok": False, "erro": "Coordenação não encontrada"}, 404)
+                    return
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "removido": coord_del_match.group(1)})
             return
 
         proj_item_del_match = re.fullmatch(r"/api/projetos/([^/]+)/itens/([^/]+)", path)
@@ -1210,6 +1385,57 @@ class Handler(SimpleHTTPRequestHandler):
                 origem_label=item["origem_label"],
             )
             self._send_json({"ok": True, "tarefa": item}, status=201)
+            return
+
+        if path == "/api/agendamentos":
+            if not self._require_postgres():
+                return
+            user = self._require_user()
+            if not user:
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_agendamento(body, usuario=user)
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "agendamento": created}, status=201)
+            return
+
+        if path == "/api/salas":
+            if not self._require_postgres() or not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_sala(body, usuario=self._current_user())
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "sala": created}, status=201)
+            return
+
+        if path == "/api/coordenacoes":
+            if not self._require_postgres() or not self._require_admin():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_coordenacao(body, usuario=self._current_user())
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "coordenacao": created}, status=201)
             return
 
         proj_itens_match = re.fullmatch(r"/api/projetos/([^/]+)/itens", path)

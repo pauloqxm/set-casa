@@ -11,7 +11,7 @@ import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
 from threading import Lock
 from typing import Any, Iterator
@@ -772,6 +772,44 @@ CREATE TABLE IF NOT EXISTS notificacoes_tarefa (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notif_tarefa_item ON notificacoes_tarefa(item_id, criado_em);
+
+CREATE TABLE IF NOT EXISTS salas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    andar TEXT,
+    capacidade INTEGER,
+    recursos TEXT[],
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_salas_ativo ON salas(ativo);
+
+CREATE TABLE IF NOT EXISTS coordenacoes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sigla TEXT NOT NULL UNIQUE,
+    nome_completo TEXT,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS agendamentos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sala_id UUID NOT NULL REFERENCES salas(id),
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    coordenacao_id UUID REFERENCES coordenacoes(id),
+    responsavel TEXT NOT NULL,
+    observacao TEXT,
+    data DATE NOT NULL,
+    hora_inicio TIME NOT NULL,
+    hora_fim TIME NOT NULL,
+    status TEXT NOT NULL DEFAULT 'confirmado',
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT agendamentos_status_check CHECK (status IN ('confirmado', 'cancelado')),
+    CONSTRAINT agendamentos_horario_valido CHECK (hora_fim > hora_inicio)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agendamentos_sala_data ON agendamentos(sala_id, data, status);
+CREATE INDEX IF NOT EXISTS idx_agendamentos_periodo ON agendamentos(data, status);
 """
 
 
@@ -794,6 +832,7 @@ def init_db(conn: _ConnProxy) -> None:
         _seed_projeto_casa_trabalhador(conn)
         _seed_projeto_tarefas_gerais(conn)
         _seed_usuario_projetos_inicial(conn)
+        _seed_agendamento_catalogos(conn)
         _SCHEMA_READY = True
 
 
@@ -1014,6 +1053,41 @@ def _seed_usuario_projetos_inicial(conn: _ConnProxy) -> None:
             VALUES (?, ?, ?, ?, ?)
             """,
             (u["id"], CASA_TRABALHADOR_ID, papel, now, now),
+        )
+
+
+def _seed_agendamento_catalogos(conn: _ConnProxy) -> None:
+    """Salas e coordenações iniciais — só no Postgres e só se as tabelas estiverem vazias."""
+    if conn.dialect != "postgres":
+        return
+    try:
+        count = conn.execute("SELECT COUNT(*) AS n FROM salas").fetchone()["n"]
+    except Exception:
+        return
+    if count:
+        return
+    salas = (
+        ("Sala de Reuniões 1", "Térreo", 8, ["projetor"]),
+        ("Sala de Reuniões 2", "1º andar", 12, ["tv", "videoconferencia"]),
+        ("Auditório", "Térreo", 40, ["projetor", "videoconferencia"]),
+    )
+    for nome, andar, capacidade, recursos in salas:
+        conn.execute(
+            """
+            INSERT INTO salas (nome, andar, capacidade, recursos, ativo)
+            VALUES (?, ?, ?, ?, TRUE)
+            """,
+            (nome, andar, capacidade, recursos),
+        )
+    coordenacoes = (
+        ("SET", "Secretaria do Trabalho"),
+        ("IDT", "Instituto de Desenvolvimento do Trabalho"),
+        ("ASCOI", "Assessoria de Comunicação Institucional"),
+    )
+    for sigla, nome in coordenacoes:
+        conn.execute(
+            "INSERT INTO coordenacoes (sigla, nome_completo) VALUES (?, ?)",
+            (sigla, nome),
         )
 
 
@@ -2507,6 +2581,751 @@ def list_audit(*, projeto_id: str | None = None, limite: int = 200) -> list[dict
                 data["detalhes"] = {}
             out.append(data)
         return out
+
+
+# --- Agendamento de salas (Postgres / Supabase) -------------------------
+
+SLOTS_AGENDA = (
+    ("08:00", "09:00"),
+    ("09:00", "10:00"),
+    ("10:00", "11:00"),
+    ("11:00", "12:00"),
+    ("13:00", "14:00"),
+    ("14:00", "15:00"),
+    ("15:00", "16:00"),
+    ("16:00", "17:00"),
+)
+
+
+def require_postgres() -> None:
+    if not USE_POSTGRES:
+        raise ValueError(
+            "Agendamento de salas exige o Postgres do Supabase (DATABASE_URL)."
+        )
+
+
+def _as_id(value: object) -> str:
+    return "" if value is None else str(value)
+
+
+def _as_date(value: object) -> str:
+    if value is None or value == "":
+        return ""
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    return str(value)[:10]
+
+
+def _as_time(value: object) -> str:
+    if value is None or value == "":
+        return ""
+    if isinstance(value, dt_time):
+        return value.strftime("%H:%M")
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M")
+    raw = str(value).strip()
+    return raw[:5]
+
+
+def _as_recursos(value: object) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(x).strip() for x in value if str(x).strip()]
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+        except json.JSONDecodeError:
+            return [x.strip() for x in value.split(",") if x.strip()]
+    return []
+
+
+def _normalize_data(value: object) -> str:
+    raw = str(value or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        raise ValueError("Informe a data no formato AAAA-MM-DD")
+    return raw
+
+
+def _normalize_recursos(value: object) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            value = [x.strip() for x in value.split(",") if x.strip()]
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("Recursos inválidos")
+    out = []
+    seen = set()
+    for item in value:
+        nome = str(item or "").strip().lower()
+        if not nome or nome in seen:
+            continue
+        seen.add(nome)
+        out.append(nome)
+    return out
+
+
+def _is_conflict_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        "sem_conflito" in msg
+        or "exclusion" in msg
+        or "23p01" in msg
+        or "conflicting key" in msg
+    )
+
+
+def _sala_public(row: Any) -> dict:
+    data = dict(row)
+    return {
+        "id": _as_id(data.get("id")),
+        "nome": data.get("nome") or "",
+        "andar": data.get("andar") or "",
+        "capacidade": data.get("capacidade"),
+        "recursos": _as_recursos(data.get("recursos")),
+        "ativo": bool(data.get("ativo", True)),
+        "criado_em": _as_date(data.get("criado_em")) or str(data.get("criado_em") or ""),
+    }
+
+
+def _coordenacao_public(row: Any) -> dict:
+    data = dict(row)
+    return {
+        "id": _as_id(data.get("id")),
+        "sigla": data.get("sigla") or "",
+        "nome_completo": data.get("nome_completo") or "",
+    }
+
+
+def _agendamento_public(row: Any, *, usuario: dict | None = None) -> dict:
+    data = dict(row)
+    item = {
+        "id": _as_id(data.get("id")),
+        "sala_id": _as_id(data.get("sala_id")),
+        "sala_nome": data.get("sala_nome") or "",
+        "usuario_id": data.get("usuario_id"),
+        "usuario_nome": data.get("usuario_nome") or "",
+        "coordenacao_id": _as_id(data.get("coordenacao_id")) or None,
+        "coordenacao_sigla": data.get("coordenacao_sigla") or "",
+        "coordenacao_nome": data.get("coordenacao_nome") or "",
+        "responsavel": data.get("responsavel") or "",
+        "observacao": data.get("observacao") or "",
+        "data": _as_date(data.get("data")),
+        "hora_inicio": _as_time(data.get("hora_inicio")),
+        "hora_fim": _as_time(data.get("hora_fim")),
+        "status": data.get("status") or "confirmado",
+        "criado_em": str(data.get("criado_em") or ""),
+    }
+    item["pode_editar"] = pode_editar_agendamento(usuario, item)
+    return item
+
+
+def pode_editar_agendamento(usuario: dict | None, item: dict) -> bool:
+    if not usuario or not item:
+        return False
+    if usuario.get("papel") == "admin":
+        return True
+    return str(usuario.get("id")) == str(item.get("usuario_id"))
+
+
+def _tem_conflito(
+    conn: _ConnProxy,
+    sala_id: str,
+    data_iso: str,
+    hora_inicio: str,
+    hora_fim: str,
+    ignore_id: str | None = None,
+) -> bool:
+    sql = """
+        SELECT 1 AS ok FROM agendamentos
+        WHERE sala_id = ?::uuid AND data = ?::date AND status = 'confirmado'
+          AND hora_inicio < ?::time AND hora_fim > ?::time
+    """
+    params: list[Any] = [sala_id, data_iso, hora_fim, hora_inicio]
+    if ignore_id:
+        sql += " AND id <> ?::uuid"
+        params.append(ignore_id)
+    return bool(conn.execute(sql, tuple(params)).fetchone())
+
+
+def list_salas(*, somente_ativas: bool = True) -> list[dict]:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        sql = "SELECT * FROM salas"
+        if somente_ativas:
+            sql += " WHERE ativo = TRUE"
+        sql += " ORDER BY lower(nome)"
+        return [_sala_public(r) for r in conn.execute(sql).fetchall()]
+
+
+def get_sala(sala_id: str) -> dict | None:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        row = conn.execute(
+            "SELECT * FROM salas WHERE id = ?::uuid", (sala_id,)
+        ).fetchone()
+        return _sala_public(row) if row else None
+
+
+def create_sala(payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    nome = (payload.get("nome") or "").strip()
+    if not nome:
+        raise ValueError("Informe o nome da sala")
+    capacidade = payload.get("capacidade")
+    if capacidade in ("", None):
+        capacidade = None
+    else:
+        try:
+            capacidade = int(capacidade)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Capacidade inválida") from exc
+        if capacidade < 0:
+            raise ValueError("Capacidade inválida")
+    recursos = _normalize_recursos(payload.get("recursos"))
+    with connect() as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            INSERT INTO salas (nome, andar, capacidade, recursos, ativo)
+            VALUES (?, ?, ?, ?, TRUE)
+            RETURNING *
+            """,
+            (
+                nome,
+                (payload.get("andar") or "").strip() or None,
+                capacidade,
+                recursos,
+            ),
+        ).fetchone()
+        created = _sala_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="sala",
+            entidade_id=created["id"],
+            acao="criar",
+            usuario=usuario,
+            detalhes={"nome": nome},
+            conn=conn,
+        )
+        return created
+
+
+def update_sala(sala_id: str, payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    fields: dict[str, Any] = {}
+    if "nome" in payload:
+        nome = (payload.get("nome") or "").strip()
+        if not nome:
+            raise ValueError("Informe o nome da sala")
+        fields["nome"] = nome
+    if "andar" in payload:
+        fields["andar"] = (payload.get("andar") or "").strip() or None
+    if "capacidade" in payload:
+        capacidade = payload.get("capacidade")
+        if capacidade in ("", None):
+            fields["capacidade"] = None
+        else:
+            try:
+                fields["capacidade"] = int(capacidade)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Capacidade inválida") from exc
+    if "recursos" in payload:
+        fields["recursos"] = _normalize_recursos(payload.get("recursos"))
+    if "ativo" in payload:
+        fields["ativo"] = bool(payload.get("ativo"))
+    if not fields:
+        current = get_sala(sala_id)
+        if not current:
+            raise ValueError("Sala não encontrada")
+        return current
+    sets = ", ".join(f"{k}=?" for k in fields)
+    params = list(fields.values()) + [sala_id]
+    with connect() as conn:
+        init_db(conn)
+        conn.execute(f"UPDATE salas SET {sets} WHERE id = ?::uuid", tuple(params))
+        row = conn.execute(
+            "SELECT * FROM salas WHERE id = ?::uuid", (sala_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("Sala não encontrada")
+        updated = _sala_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="sala",
+            entidade_id=sala_id,
+            acao="editar",
+            usuario=usuario,
+            detalhes=fields,
+            conn=conn,
+        )
+        return updated
+
+
+def delete_sala(sala_id: str, *, usuario: dict | None = None) -> bool:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        used = conn.execute(
+            """
+            SELECT 1 AS ok FROM agendamentos
+            WHERE sala_id = ?::uuid AND status = 'confirmado'
+            LIMIT 1
+            """,
+            (sala_id,),
+        ).fetchone()
+        if used:
+            conn.execute(
+                "UPDATE salas SET ativo = FALSE WHERE id = ?::uuid", (sala_id,)
+            )
+            add_audit(
+                projeto_id=None,
+                entidade="sala",
+                entidade_id=sala_id,
+                acao="desativar",
+                usuario=usuario,
+                conn=conn,
+            )
+            return True
+        cur = conn.execute("DELETE FROM salas WHERE id = ?::uuid", (sala_id,))
+        if cur.rowcount == 0:
+            return False
+        add_audit(
+            projeto_id=None,
+            entidade="sala",
+            entidade_id=sala_id,
+            acao="excluir",
+            usuario=usuario,
+            conn=conn,
+        )
+        return True
+
+
+def list_coordenacoes() -> list[dict]:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        rows = conn.execute(
+            "SELECT * FROM coordenacoes ORDER BY lower(sigla)"
+        ).fetchall()
+        return [_coordenacao_public(r) for r in rows]
+
+
+def create_coordenacao(payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    sigla = (payload.get("sigla") or "").strip().upper()
+    if not sigla:
+        raise ValueError("Informe a sigla da coordenação")
+    nome = (payload.get("nome_completo") or payload.get("nome") or "").strip()
+    with connect() as conn:
+        init_db(conn)
+        exists = conn.execute(
+            "SELECT 1 FROM coordenacoes WHERE upper(sigla) = ?", (sigla,)
+        ).fetchone()
+        if exists:
+            raise ValueError("Já existe uma coordenação com essa sigla")
+        row = conn.execute(
+            """
+            INSERT INTO coordenacoes (sigla, nome_completo)
+            VALUES (?, ?)
+            RETURNING *
+            """,
+            (sigla, nome or None),
+        ).fetchone()
+        created = _coordenacao_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="coordenacao",
+            entidade_id=created["id"],
+            acao="criar",
+            usuario=usuario,
+            detalhes={"sigla": sigla},
+            conn=conn,
+        )
+        return created
+
+
+def update_coordenacao(
+    coordenacao_id: str, payload: dict, *, usuario: dict | None = None
+) -> dict:
+    require_postgres()
+    fields: dict[str, Any] = {}
+    if "sigla" in payload:
+        sigla = (payload.get("sigla") or "").strip().upper()
+        if not sigla:
+            raise ValueError("Informe a sigla da coordenação")
+        fields["sigla"] = sigla
+    if "nome_completo" in payload or "nome" in payload:
+        fields["nome_completo"] = (
+            payload.get("nome_completo") or payload.get("nome") or ""
+        ).strip() or None
+    if not fields:
+        raise ValueError("Nada para atualizar")
+    with connect() as conn:
+        init_db(conn)
+        if "sigla" in fields:
+            dup = conn.execute(
+                "SELECT 1 FROM coordenacoes WHERE upper(sigla) = ? AND id <> ?::uuid",
+                (fields["sigla"], coordenacao_id),
+            ).fetchone()
+            if dup:
+                raise ValueError("Já existe uma coordenação com essa sigla")
+        sets = ", ".join(f"{k}=?" for k in fields)
+        params = list(fields.values()) + [coordenacao_id]
+        conn.execute(
+            f"UPDATE coordenacoes SET {sets} WHERE id = ?::uuid", tuple(params)
+        )
+        row = conn.execute(
+            "SELECT * FROM coordenacoes WHERE id = ?::uuid", (coordenacao_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("Coordenação não encontrada")
+        updated = _coordenacao_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="coordenacao",
+            entidade_id=coordenacao_id,
+            acao="editar",
+            usuario=usuario,
+            detalhes=fields,
+            conn=conn,
+        )
+        return updated
+
+
+def delete_coordenacao(coordenacao_id: str, *, usuario: dict | None = None) -> bool:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        used = conn.execute(
+            """
+            SELECT 1 AS ok FROM agendamentos
+            WHERE coordenacao_id = ?::uuid AND status = 'confirmado'
+            LIMIT 1
+            """,
+            (coordenacao_id,),
+        ).fetchone()
+        if used:
+            raise ValueError(
+                "Não é possível excluir: há agendamentos confirmados nesta coordenação"
+            )
+        cur = conn.execute(
+            "DELETE FROM coordenacoes WHERE id = ?::uuid", (coordenacao_id,)
+        )
+        if cur.rowcount == 0:
+            return False
+        add_audit(
+            projeto_id=None,
+            entidade="coordenacao",
+            entidade_id=coordenacao_id,
+            acao="excluir",
+            usuario=usuario,
+            conn=conn,
+        )
+        return True
+
+
+def _agendamento_select_sql() -> str:
+    return """
+        SELECT a.*,
+               s.nome AS sala_nome,
+               c.sigla AS coordenacao_sigla,
+               c.nome_completo AS coordenacao_nome,
+               u.nome AS usuario_nome
+        FROM agendamentos a
+        JOIN salas s ON s.id = a.sala_id
+        LEFT JOIN coordenacoes c ON c.id = a.coordenacao_id
+        LEFT JOIN usuarios u ON u.id = a.usuario_id
+    """
+
+
+def get_agendamento(agendamento_id: str) -> dict | None:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        row = conn.execute(
+            _agendamento_select_sql() + " WHERE a.id = ?::uuid",
+            (agendamento_id,),
+        ).fetchone()
+        return _agendamento_public(row) if row else None
+
+
+def list_agendamentos(
+    *,
+    de: str = "",
+    ate: str = "",
+    sala_id: str = "",
+    usuario: dict | None = None,
+) -> list[dict]:
+    require_postgres()
+    sql = _agendamento_select_sql() + " WHERE 1=1"
+    params: list[Any] = []
+    if de:
+        sql += " AND a.data >= ?::date"
+        params.append(_normalize_data(de))
+    if ate:
+        sql += " AND a.data <= ?::date"
+        params.append(_normalize_data(ate))
+    if sala_id:
+        sql += " AND a.sala_id = ?::uuid"
+        params.append(sala_id)
+    sql += " ORDER BY a.data, a.hora_inicio, s.nome"
+    with connect() as conn:
+        init_db(conn)
+        rows = conn.execute(sql, tuple(params)).fetchall()
+        return [_agendamento_public(r, usuario=usuario) for r in rows]
+
+
+def compute_agendamento_kpis(
+    agendamentos: list[dict],
+    salas: list[dict],
+    de: str,
+    ate: str,
+) -> dict:
+    confirmados = [a for a in agendamentos if a.get("status") == "confirmado"]
+    ativas = [s for s in salas if s.get("ativo")]
+    by_sala: dict[str, int] = {}
+    by_hora: dict[str, int] = {}
+    for item in confirmados:
+        sid = item.get("sala_id") or ""
+        by_sala[sid] = by_sala.get(sid, 0) + 1
+        hora = item.get("hora_inicio") or ""
+        by_hora[hora] = by_hora.get(hora, 0) + 1
+    sala_mais = None
+    if by_sala:
+        top_id = max(by_sala, key=by_sala.get)
+        nome = next((s["nome"] for s in ativas if s["id"] == top_id), "")
+        if not nome:
+            nome = next(
+                (a.get("sala_nome") for a in confirmados if a.get("sala_id") == top_id),
+                "—",
+            )
+        sala_mais = {"id": top_id, "nome": nome, "total": by_sala[top_id]}
+    horario_pico = None
+    if by_hora:
+        top_hora = max(by_hora, key=by_hora.get)
+        horario_pico = {"hora": top_hora, "total": by_hora[top_hora]}
+    dias_uteis = 0
+    try:
+        start = date.fromisoformat(de) if de else None
+        end = date.fromisoformat(ate) if ate else start
+        if start and end and end >= start:
+            cur = start
+            while cur <= end:
+                if cur.weekday() < 5:
+                    dias_uteis += 1
+                cur += timedelta(days=1)
+    except ValueError:
+        dias_uteis = 0
+    capacidade = len(ativas) * len(SLOTS_AGENDA) * max(dias_uteis, 0)
+    ocupacao = (
+        round(100 * len(confirmados) / capacidade, 1) if capacidade else 0.0
+    )
+    return {
+        "total": len(confirmados),
+        "cancelados": sum(1 for a in agendamentos if a.get("status") == "cancelado"),
+        "salas_ativas": len(ativas),
+        "ocupacao_pct": ocupacao,
+        "sala_mais_usada": sala_mais,
+        "horario_pico": horario_pico,
+    }
+
+
+def create_agendamento(payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    if not usuario or not usuario.get("id"):
+        raise ValueError("Usuário não autenticado")
+    sala_id = (payload.get("sala_id") or "").strip()
+    if not sala_id:
+        raise ValueError("Selecione a sala")
+    data_iso = _normalize_data(payload.get("data"))
+    hora_inicio = _normalize_prazo_hora(payload.get("hora_inicio"))
+    hora_fim = _normalize_prazo_hora(payload.get("hora_fim"))
+    if not hora_inicio or not hora_fim:
+        raise ValueError("Informe o horário de início e fim")
+    if hora_fim <= hora_inicio:
+        raise ValueError("O horário final deve ser depois do inicial")
+    responsavel = (payload.get("responsavel") or "").strip()
+    if not responsavel:
+        raise ValueError("Informe o responsável")
+    coordenacao_id = (payload.get("coordenacao_id") or "").strip() or None
+    observacao = (payload.get("observacao") or "").strip() or None
+    with connect() as conn:
+        init_db(conn)
+        sala = conn.execute(
+            "SELECT * FROM salas WHERE id = ?::uuid", (sala_id,)
+        ).fetchone()
+        if not sala:
+            raise ValueError("Sala não encontrada")
+        if not sala.get("ativo", True):
+            raise ValueError("Esta sala está inativa")
+        if coordenacao_id:
+            coord = conn.execute(
+                "SELECT 1 FROM coordenacoes WHERE id = ?::uuid", (coordenacao_id,)
+            ).fetchone()
+            if not coord:
+                raise ValueError("Coordenação não encontrada")
+        if _tem_conflito(conn, sala_id, data_iso, hora_inicio, hora_fim):
+            raise ValueError("Já existe um agendamento confirmado neste horário.")
+        try:
+            row = conn.execute(
+                """
+                INSERT INTO agendamentos (
+                    sala_id, usuario_id, coordenacao_id, responsavel, observacao,
+                    data, hora_inicio, hora_fim, status
+                ) VALUES (?::uuid, ?, ?::uuid, ?, ?, ?::date, ?::time, ?::time, 'confirmado')
+                RETURNING id
+                """,
+                (
+                    sala_id,
+                    int(usuario["id"]),
+                    coordenacao_id,
+                    responsavel,
+                    observacao,
+                    data_iso,
+                    hora_inicio,
+                    hora_fim,
+                ),
+            ).fetchone()
+        except Exception as exc:
+            if _is_conflict_error(exc):
+                raise ValueError(
+                    "Já existe um agendamento confirmado neste horário."
+                ) from exc
+            raise
+        created_id = _as_id(row["id"])
+        full = conn.execute(
+            _agendamento_select_sql() + " WHERE a.id = ?::uuid",
+            (created_id,),
+        ).fetchone()
+        created = _agendamento_public(full, usuario=usuario)
+        add_audit(
+            projeto_id=None,
+            entidade="agendamento",
+            entidade_id=created_id,
+            acao="criar",
+            usuario=usuario,
+            detalhes={
+                "sala_id": sala_id,
+                "data": data_iso,
+                "hora_inicio": hora_inicio,
+                "hora_fim": hora_fim,
+            },
+            conn=conn,
+        )
+        return created
+
+
+def update_agendamento(
+    agendamento_id: str, payload: dict, *, usuario: dict | None = None
+) -> dict:
+    require_postgres()
+    current = get_agendamento(agendamento_id)
+    if not current:
+        raise ValueError("Agendamento não encontrado")
+    if not pode_editar_agendamento(usuario, current):
+        raise ValueError("Sem permissão para editar este agendamento")
+    if current["status"] == "cancelado" and payload.get("status") != "confirmado":
+        raise ValueError("Este agendamento já foi cancelado")
+    sala_id = (payload.get("sala_id") or current["sala_id"]).strip()
+    data_iso = _normalize_data(payload.get("data") or current["data"])
+    hora_inicio = _normalize_prazo_hora(
+        payload.get("hora_inicio") or current["hora_inicio"]
+    )
+    hora_fim = _normalize_prazo_hora(payload.get("hora_fim") or current["hora_fim"])
+    if not hora_inicio or not hora_fim:
+        raise ValueError("Informe o horário de início e fim")
+    if hora_fim <= hora_inicio:
+        raise ValueError("O horário final deve ser depois do inicial")
+    responsavel = (
+        payload.get("responsavel")
+        if "responsavel" in payload
+        else current["responsavel"]
+    )
+    responsavel = (responsavel or "").strip()
+    if not responsavel:
+        raise ValueError("Informe o responsável")
+    if "coordenacao_id" in payload:
+        coordenacao_id = (payload.get("coordenacao_id") or "").strip() or None
+    else:
+        coordenacao_id = current.get("coordenacao_id") or None
+    observacao = (
+        payload.get("observacao")
+        if "observacao" in payload
+        else current.get("observacao")
+    )
+    observacao = (observacao or "").strip() or None
+    status = (payload.get("status") or current["status"]).strip()
+    if status not in ("confirmado", "cancelado"):
+        raise ValueError("Status inválido")
+    with connect() as conn:
+        init_db(conn)
+        if status == "confirmado" and _tem_conflito(
+            conn, sala_id, data_iso, hora_inicio, hora_fim, ignore_id=agendamento_id
+        ):
+            raise ValueError("Já existe um agendamento confirmado neste horário.")
+        try:
+            conn.execute(
+                """
+                UPDATE agendamentos SET
+                    sala_id = ?::uuid,
+                    coordenacao_id = ?::uuid,
+                    responsavel = ?,
+                    observacao = ?,
+                    data = ?::date,
+                    hora_inicio = ?::time,
+                    hora_fim = ?::time,
+                    status = ?
+                WHERE id = ?::uuid
+                """,
+                (
+                    sala_id,
+                    coordenacao_id,
+                    responsavel,
+                    observacao,
+                    data_iso,
+                    hora_inicio,
+                    hora_fim,
+                    status,
+                    agendamento_id,
+                ),
+            )
+        except Exception as exc:
+            if _is_conflict_error(exc):
+                raise ValueError(
+                    "Já existe um agendamento confirmado neste horário."
+                ) from exc
+            raise
+        row = conn.execute(
+            _agendamento_select_sql() + " WHERE a.id = ?::uuid",
+            (agendamento_id,),
+        ).fetchone()
+        updated = _agendamento_public(row, usuario=usuario)
+        add_audit(
+            projeto_id=None,
+            entidade="agendamento",
+            entidade_id=agendamento_id,
+            acao="editar",
+            usuario=usuario,
+            detalhes={"status": status, "data": data_iso},
+            conn=conn,
+        )
+        return updated
+
+
+def cancel_agendamento(agendamento_id: str, *, usuario: dict | None = None) -> dict:
+    return update_agendamento(
+        agendamento_id, {"status": "cancelado"}, usuario=usuario
+    )
 
 
 def ensure_db() -> str:

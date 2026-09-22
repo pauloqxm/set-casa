@@ -1,0 +1,144 @@
+.salas-week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.salas-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.salas-day-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #e4e4e4;
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.salas-day-btn.is-active {
+  background: var(--green);
+  color: var(--white);
+}
+
+.salas-day-btn.is-weekend {
+  opacity: 0.7;
+}
+
+.salas-grid-wrap {
+  overflow-x: auto;
+}
+
+.salas-grid {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+
+.salas-grid th,
+.salas-grid td {
+  border: 1px solid var(--line);
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.salas-grid th {
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.salas-grid th.hora,
+.salas-grid td.hora {
+  width: 4.5rem;
+  background: #f7f7f7;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.salas-slot {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: #f3faf4;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.salas-slot:hover {
+  background: var(--green-soft);
+}
+
+.salas-slot.is-busy {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.salas-slot.is-busy:hover {
+  filter: brightness(0.97);
+}
+
+.salas-slot.is-mine {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.salas-slot-meta {
+  display: block;
+  font-weight: 500;
+  font-size: 0.62rem;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.salas-admin-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.salas-admin-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.salas-admin-item.is-inactive {
+  opacity: 0.55;
+}
+
+.salas-admin-item strong {
+  display: block;
+}
+
+.salas-admin-item span {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+  .salas-grid {
+    min-width: 420px;
+  }
+}

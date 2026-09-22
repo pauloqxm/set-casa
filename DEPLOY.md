@@ -38,6 +38,14 @@ com a URL do projeto e a chave `anon` pode ler/alterar dados — incluindo
 
 Após rodar o script, os alertas de RLS devem sumir em até 24 h.
 
+### Agendamento de salas
+
+1. Faça o deploy (as tabelas `salas`, `coordenacoes` e `agendamentos` nascem no `init_db`).
+2. Supabase → **SQL Editor** → execute [`supabase/agendamento_salas.sql`](supabase/agendamento_salas.sql)
+   (extensão `btree_gist`, constraint `sem_conflito` e RLS das três tabelas).
+3. Para desfazer só este módulo: [`supabase/rollback_agendamento_salas.sql`](supabase/rollback_agendamento_salas.sql)
+   e checkout da branch `backup-antes-agendamento-salas`.
+
 ## 2. Railway
 
 1. Crie um serviço a partir do repositório Git.

@@ -13,6 +13,9 @@ ALTER TABLE IF EXISTS public.projetos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.usuario_projetos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.notificacoes_tarefa ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.salas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.coordenacoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.agendamentos ENABLE ROW LEVEL SECURITY;
 
 -- Sem políticas para anon/authenticated = API REST bloqueada.
 -- Não crie policies "USING (true)" aqui — isso reabriria o acesso público.

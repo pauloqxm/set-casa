@@ -49,6 +49,7 @@
     btnCancelarAgenda: document.getElementById("btnCancelarAgenda"),
     btnFecharModal: document.getElementById("btnFecharModal"),
     btnSalvarAgenda: document.getElementById("btnSalvarAgenda"),
+    agendaSomenteLeitura: document.getElementById("agendaSomenteLeitura"),
   };
 
   const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -291,7 +292,7 @@
                 slot.fim
               )}">Livre</button></td>`;
             }
-            const mine = booking.pode_editar ? " is-mine" : "";
+            const mine = podeEditarReserva(booking) ? " is-mine" : "";
             const label = booking.coordenacao_sigla || booking.responsavel || "Ocupado";
             return `<td><button type="button" class="salas-slot is-busy${mine}" data-id="${escapeAttr(
               booking.id
@@ -352,6 +353,13 @@
       .join("");
   }
 
+  function podeEditarReserva(item) {
+    if (!item || !state.user) return false;
+    if (state.user.papel === "admin") return true;
+    if (item.usuario_id == null || state.user.id == null) return false;
+    return String(item.usuario_id) === String(state.user.id);
+  }
+
   function openModal(mode, preset) {
     el.modalErro.hidden = true;
     el.modalErro.textContent = "";
@@ -376,10 +384,17 @@
     el.agendaResp.value = preset.responsavel || state.user?.nome || "";
     el.agendaObs.value = preset.observacao || "";
     const editing = mode === "edit";
-    el.modalTitle.textContent = editing ? "Editar agendamento" : "Novo agendamento";
-    const canEdit = !editing || preset.pode_editar;
+    const canEdit = !editing || podeEditarReserva(preset);
+    el.modalTitle.textContent = editing
+      ? canEdit
+        ? "Editar agendamento"
+        : "Visualizar agendamento"
+      : "Novo agendamento";
     el.btnSalvarAgenda.hidden = !canEdit;
-    el.btnCancelarAgenda.hidden = !(editing && preset.pode_editar);
+    el.btnCancelarAgenda.hidden = !(editing && canEdit);
+    if (el.agendaSomenteLeitura) {
+      el.agendaSomenteLeitura.hidden = !editing || canEdit;
+    }
     ["agendaSala", "agendaData", "agendaInicio", "agendaFim", "agendaCoord", "agendaResp", "agendaObs"].forEach(
       (id) => {
         el[id].disabled = !canEdit;
@@ -474,8 +489,17 @@
       responsavel: el.agendaResp.value.trim(),
       observacao: el.agendaObs.value.trim(),
     };
+    const id = el.agendaId.value;
+    if (id) {
+      const atual = state.agendamentos.find((a) => a.id === id);
+      if (!podeEditarReserva(atual)) {
+        el.modalErro.hidden = false;
+        el.modalErro.textContent =
+          "Somente quem criou a reserva ou um administrador pode editar.";
+        return;
+      }
+    }
     try {
-      const id = el.agendaId.value;
       if (id) {
         await api(`/api/agendamentos/${encodeURIComponent(id)}`, {
           method: "PATCH",
@@ -500,6 +524,13 @@
   el.btnCancelarAgenda.addEventListener("click", async () => {
     const id = el.agendaId.value;
     if (!id) return;
+    const atual = state.agendamentos.find((a) => a.id === id);
+    if (!podeEditarReserva(atual)) {
+      el.modalErro.hidden = false;
+      el.modalErro.textContent =
+        "Somente quem criou a reserva ou um administrador pode cancelar.";
+      return;
+    }
     if (!window.confirm("Cancelar este agendamento? O horário ficará livre.")) return;
     try {
       await api(`/api/agendamentos/${encodeURIComponent(id)}`, { method: "DELETE" });

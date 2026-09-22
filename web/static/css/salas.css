@@ -186,6 +186,16 @@
   opacity: 0.55;
 }
 
+.salas-somente-leitura {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff3e6;
+  color: #c45a00;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .salas-admin-actions {
   display: flex;
   flex-wrap: wrap;

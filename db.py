@@ -2728,11 +2728,16 @@ def _agendamento_public(row: Any, *, usuario: dict | None = None) -> dict:
 
 
 def pode_editar_agendamento(usuario: dict | None, item: dict) -> bool:
+    """Só o autor da reserva ou um administrador global pode editar/cancelar."""
     if not usuario or not item:
         return False
     if usuario.get("papel") == "admin":
         return True
-    return str(usuario.get("id")) == str(item.get("usuario_id"))
+    autor_id = item.get("usuario_id")
+    user_id = usuario.get("id")
+    if autor_id in (None, "") or user_id in (None, ""):
+        return False
+    return str(user_id) == str(autor_id)
 
 
 def _tem_conflito(

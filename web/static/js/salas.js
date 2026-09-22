@@ -12,6 +12,7 @@
     btnSemanaAnt: document.getElementById("btnSemanaAnt"),
     btnSemanaProx: document.getElementById("btnSemanaProx"),
     btnHoje: document.getElementById("btnHoje"),
+    irParaData: document.getElementById("irParaData"),
     diasTabs: document.getElementById("diasTabs"),
     grade: document.getElementById("grade"),
     gradeEmpty: document.getElementById("gradeEmpty"),
@@ -249,6 +250,7 @@
     el.semanaLabel.textContent = `${fmtBr(isoDate(state.weekStart))} a ${fmtBr(
       isoDate(fim)
     )}`;
+    if (el.irParaData) el.irParaData.value = state.selectedDate;
   }
 
   function renderGrid() {
@@ -510,6 +512,18 @@
     state.selectedDate = isoDate(hoje);
     loadAgenda().catch((err) => console.error(err));
   });
+
+  function irParaDia(iso) {
+    if (!iso) return;
+    const dia = parseIso(iso);
+    state.weekStart = startOfWeek(dia);
+    state.selectedDate = isoDate(dia);
+    loadAgenda().catch((err) => console.error(err));
+  }
+
+  if (el.irParaData) {
+    el.irParaData.addEventListener("change", () => irParaDia(el.irParaData.value));
+  }
 
   el.formSala.addEventListener("submit", async (event) => {
     event.preventDefault();

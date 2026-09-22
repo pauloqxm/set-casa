@@ -1,7 +1,27 @@
 .salas-week-nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+.salas-date-jump {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.salas-date-jump .btn-ghost {
+  pointer-events: none;
+}
+
+.salas-date-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
 }
 
 .salas-days {

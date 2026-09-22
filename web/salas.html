@@ -98,6 +98,12 @@
               <p id="semanaLabel">—</p>
             </div>
             <div class="salas-week-nav">
+              <label class="salas-local-filter">
+                Local
+                <select id="filtroLocal" aria-label="Escolha de locais">
+                  <option value="">Todos os locais</option>
+                </select>
+              </label>
               <button type="button" class="btn-ghost btn-small" id="btnSemanaAnt">
                 ← Semana
               </button>
@@ -125,6 +131,35 @@
           </p>
         </section>
 
+        <section class="panel admin-panel" id="adminLocais" hidden>
+          <div class="panel-head">
+            <h2>Cadastro de locais</h2>
+            <p>Sede, unidades e demais endereços onde as salas ficam</p>
+          </div>
+          <form id="formLocal" class="admin-form">
+            <input type="hidden" id="localId" value="" />
+            <div class="admin-form-grid">
+              <label>
+                Nome
+                <input id="localNome" type="text" required autocomplete="off" />
+              </label>
+              <label>
+                Endereço
+                <input id="localEndereco" type="text" autocomplete="off" />
+              </label>
+            </div>
+            <div class="dialog-actions-right admin-form-actions">
+              <button type="button" class="btn-ghost btn-small" id="btnCancelarLocal" hidden>
+                Cancelar edição
+              </button>
+              <button type="submit" class="btn-run btn-small" id="btnSalvarLocal">
+                Salvar local
+              </button>
+            </div>
+          </form>
+          <div class="salas-admin-list" id="listaLocais"></div>
+        </section>
+
         <section class="panel admin-panel" id="adminSalas" hidden>
           <div class="panel-head">
             <h2>Cadastro de salas</h2>
@@ -136,6 +171,12 @@
               <label>
                 Nome
                 <input id="salaNome" type="text" required autocomplete="off" />
+              </label>
+              <label>
+                Local
+                <select id="salaLocal">
+                  <option value="">— Selecione —</option>
+                </select>
               </label>
               <label>
                 Andar

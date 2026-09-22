@@ -773,9 +773,20 @@ CREATE TABLE IF NOT EXISTS notificacoes_tarefa (
 
 CREATE INDEX IF NOT EXISTS idx_notif_tarefa_item ON notificacoes_tarefa(item_id, criado_em);
 
+CREATE TABLE IF NOT EXISTS locais (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL UNIQUE,
+    endereco TEXT,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_locais_ativo ON locais(ativo);
+
 CREATE TABLE IF NOT EXISTS salas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL,
+    local_id UUID REFERENCES locais(id),
     andar TEXT,
     capacidade INTEGER,
     recursos TEXT[],
@@ -784,6 +795,7 @@ CREATE TABLE IF NOT EXISTS salas (
 );
 
 CREATE INDEX IF NOT EXISTS idx_salas_ativo ON salas(ativo);
+CREATE INDEX IF NOT EXISTS idx_salas_local ON salas(local_id);
 
 CREATE TABLE IF NOT EXISTS coordenacoes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -832,6 +844,7 @@ def init_db(conn: _ConnProxy) -> None:
         _seed_projeto_casa_trabalhador(conn)
         _seed_projeto_tarefas_gerais(conn)
         _seed_usuario_projetos_inicial(conn)
+        _seed_locais(conn)
         _seed_agendamento_catalogos(conn)
         _SCHEMA_READY = True
 
@@ -894,6 +907,13 @@ def _ensure_columns(conn: _ConnProxy) -> None:
             WHERE id = ? AND TRIM(COALESCE(inicio_projeto, '')) = ''
             """,
             (CASA_TRABALHADOR_ID,),
+        )
+        if not _has_col("salas", "local_id"):
+            conn.execute(
+                "ALTER TABLE salas ADD COLUMN local_id UUID REFERENCES locais(id)"
+            )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_salas_local ON salas(local_id)"
         )
         ensure_uploads_dir()
         return
@@ -1056,6 +1076,23 @@ def _seed_usuario_projetos_inicial(conn: _ConnProxy) -> None:
         )
 
 
+def _seed_locais(conn: _ConnProxy) -> None:
+    """Locais iniciais — só no Postgres e só se a tabela estiver vazia."""
+    if conn.dialect != "postgres":
+        return
+    try:
+        count = conn.execute("SELECT COUNT(*) AS n FROM locais").fetchone()["n"]
+    except Exception:
+        return
+    if count:
+        return
+    for nome in ("Sede", "Unidade Centro", "Unidade Quixeramobim"):
+        conn.execute(
+            "INSERT INTO locais (nome, endereco, ativo) VALUES (?, NULL, TRUE)",
+            (nome,),
+        )
+
+
 def _seed_agendamento_catalogos(conn: _ConnProxy) -> None:
     """Salas e coordenações iniciais — só no Postgres e só se as tabelas estiverem vazias."""
     if conn.dialect != "postgres":
@@ -1066,6 +1103,10 @@ def _seed_agendamento_catalogos(conn: _ConnProxy) -> None:
         return
     if count:
         return
+    sede = conn.execute(
+        "SELECT id FROM locais WHERE lower(nome) = 'sede' LIMIT 1"
+    ).fetchone()
+    sede_id = sede["id"] if sede else None
     salas = (
         ("Sala de Reuniões 1", "Térreo", 8, ["projetor"]),
         ("Sala de Reuniões 2", "1º andar", 12, ["tv", "videoconferencia"]),
@@ -1074,10 +1115,10 @@ def _seed_agendamento_catalogos(conn: _ConnProxy) -> None:
     for nome, andar, capacidade, recursos in salas:
         conn.execute(
             """
-            INSERT INTO salas (nome, andar, capacidade, recursos, ativo)
-            VALUES (?, ?, ?, ?, TRUE)
+            INSERT INTO salas (nome, local_id, andar, capacidade, recursos, ativo)
+            VALUES (?, ?, ?, ?, ?, TRUE)
             """,
-            (nome, andar, capacidade, recursos),
+            (nome, sede_id, andar, capacidade, recursos),
         )
     coordenacoes = (
         ("SET", "Secretaria do Trabalho"),
@@ -2682,11 +2723,35 @@ def _is_conflict_error(exc: Exception) -> bool:
     )
 
 
+def _local_public(row: Any) -> dict:
+    data = dict(row)
+    return {
+        "id": _as_id(data.get("id")),
+        "nome": data.get("nome") or "",
+        "endereco": data.get("endereco") or "",
+        "ativo": bool(data.get("ativo", True)),
+        "criado_em": _as_date(data.get("criado_em")) or str(data.get("criado_em") or ""),
+    }
+
+
+def _sala_select_sql() -> str:
+    return """
+        SELECT s.*,
+               l.nome AS local_nome,
+               l.endereco AS local_endereco
+        FROM salas s
+        LEFT JOIN locais l ON l.id = s.local_id
+    """
+
+
 def _sala_public(row: Any) -> dict:
     data = dict(row)
     return {
         "id": _as_id(data.get("id")),
         "nome": data.get("nome") or "",
+        "local_id": _as_id(data.get("local_id")) or None,
+        "local_nome": data.get("local_nome") or "",
+        "local_endereco": data.get("local_endereco") or "",
         "andar": data.get("andar") or "",
         "capacidade": data.get("capacidade"),
         "recursos": _as_recursos(data.get("recursos")),
@@ -2760,14 +2825,26 @@ def _tem_conflito(
     return bool(conn.execute(sql, tuple(params)).fetchone())
 
 
+def _normalize_local_id(conn: _ConnProxy, value: Any) -> str | None:
+    local_id = str(value or "").strip()
+    if not local_id:
+        return None
+    row = conn.execute(
+        "SELECT id FROM locais WHERE id = ?::uuid", (local_id,)
+    ).fetchone()
+    if not row:
+        raise ValueError("Local não encontrado")
+    return _as_id(row["id"])
+
+
 def list_salas(*, somente_ativas: bool = True) -> list[dict]:
     require_postgres()
     with connect() as conn:
         init_db(conn)
-        sql = "SELECT * FROM salas"
+        sql = _sala_select_sql()
         if somente_ativas:
-            sql += " WHERE ativo = TRUE"
-        sql += " ORDER BY lower(nome)"
+            sql += " WHERE s.ativo = TRUE"
+        sql += " ORDER BY lower(COALESCE(l.nome, '')), lower(s.nome)"
         return [_sala_public(r) for r in conn.execute(sql).fetchall()]
 
 
@@ -2776,7 +2853,7 @@ def get_sala(sala_id: str) -> dict | None:
     with connect() as conn:
         init_db(conn)
         row = conn.execute(
-            "SELECT * FROM salas WHERE id = ?::uuid", (sala_id,)
+            _sala_select_sql() + " WHERE s.id = ?::uuid", (sala_id,)
         ).fetchone()
         return _sala_public(row) if row else None
 
@@ -2799,27 +2876,33 @@ def create_sala(payload: dict, *, usuario: dict | None = None) -> dict:
     recursos = _normalize_recursos(payload.get("recursos"))
     with connect() as conn:
         init_db(conn)
+        local_id = _normalize_local_id(conn, payload.get("local_id"))
         row = conn.execute(
             """
-            INSERT INTO salas (nome, andar, capacidade, recursos, ativo)
-            VALUES (?, ?, ?, ?, TRUE)
-            RETURNING *
+            INSERT INTO salas (nome, local_id, andar, capacidade, recursos, ativo)
+            VALUES (?, ?, ?, ?, ?, TRUE)
+            RETURNING id
             """,
             (
                 nome,
+                local_id,
                 (payload.get("andar") or "").strip() or None,
                 capacidade,
                 recursos,
             ),
         ).fetchone()
-        created = _sala_public(row)
+        created = _sala_public(
+            conn.execute(
+                _sala_select_sql() + " WHERE s.id = ?::uuid", (row["id"],)
+            ).fetchone()
+        )
         add_audit(
             projeto_id=None,
             entidade="sala",
             entidade_id=created["id"],
             acao="criar",
             usuario=usuario,
-            detalhes={"nome": nome},
+            detalhes={"nome": nome, "local_id": local_id},
             conn=conn,
         )
         return created
@@ -2833,6 +2916,8 @@ def update_sala(sala_id: str, payload: dict, *, usuario: dict | None = None) -> 
         if not nome:
             raise ValueError("Informe o nome da sala")
         fields["nome"] = nome
+    if "local_id" in payload:
+        fields["local_id"] = payload.get("local_id")
     if "andar" in payload:
         fields["andar"] = (payload.get("andar") or "").strip() or None
     if "capacidade" in payload:
@@ -2857,9 +2942,12 @@ def update_sala(sala_id: str, payload: dict, *, usuario: dict | None = None) -> 
     params = list(fields.values()) + [sala_id]
     with connect() as conn:
         init_db(conn)
+        if "local_id" in fields:
+            fields["local_id"] = _normalize_local_id(conn, fields["local_id"])
+            params = list(fields.values()) + [sala_id]
         conn.execute(f"UPDATE salas SET {sets} WHERE id = ?::uuid", tuple(params))
         row = conn.execute(
-            "SELECT * FROM salas WHERE id = ?::uuid", (sala_id,)
+            _sala_select_sql() + " WHERE s.id = ?::uuid", (sala_id,)
         ).fetchone()
         if not row:
             raise ValueError("Sala não encontrada")
@@ -2908,6 +2996,143 @@ def delete_sala(sala_id: str, *, usuario: dict | None = None) -> bool:
             projeto_id=None,
             entidade="sala",
             entidade_id=sala_id,
+            acao="excluir",
+            usuario=usuario,
+            conn=conn,
+        )
+        return True
+
+
+def list_locais(*, somente_ativos: bool = False) -> list[dict]:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        sql = "SELECT * FROM locais"
+        if somente_ativos:
+            sql += " WHERE ativo = TRUE"
+        sql += " ORDER BY lower(nome)"
+        return [_local_public(r) for r in conn.execute(sql).fetchall()]
+
+
+def get_local(local_id: str) -> dict | None:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        row = conn.execute(
+            "SELECT * FROM locais WHERE id = ?::uuid", (local_id,)
+        ).fetchone()
+        return _local_public(row) if row else None
+
+
+def create_local(payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    nome = (payload.get("nome") or "").strip()
+    if not nome:
+        raise ValueError("Informe o nome do local")
+    endereco = (payload.get("endereco") or "").strip() or None
+    with connect() as conn:
+        init_db(conn)
+        exists = conn.execute(
+            "SELECT 1 FROM locais WHERE lower(nome) = lower(?)", (nome,)
+        ).fetchone()
+        if exists:
+            raise ValueError("Já existe um local com esse nome")
+        row = conn.execute(
+            """
+            INSERT INTO locais (nome, endereco, ativo)
+            VALUES (?, ?, TRUE)
+            RETURNING *
+            """,
+            (nome, endereco),
+        ).fetchone()
+        created = _local_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="local",
+            entidade_id=created["id"],
+            acao="criar",
+            usuario=usuario,
+            detalhes={"nome": nome},
+            conn=conn,
+        )
+        return created
+
+
+def update_local(local_id: str, payload: dict, *, usuario: dict | None = None) -> dict:
+    require_postgres()
+    fields: dict[str, Any] = {}
+    if "nome" in payload:
+        nome = (payload.get("nome") or "").strip()
+        if not nome:
+            raise ValueError("Informe o nome do local")
+        fields["nome"] = nome
+    if "endereco" in payload:
+        fields["endereco"] = (payload.get("endereco") or "").strip() or None
+    if "ativo" in payload:
+        fields["ativo"] = bool(payload.get("ativo"))
+    if not fields:
+        current = get_local(local_id)
+        if not current:
+            raise ValueError("Local não encontrado")
+        return current
+    with connect() as conn:
+        init_db(conn)
+        if "nome" in fields:
+            dup = conn.execute(
+                "SELECT 1 FROM locais WHERE lower(nome) = lower(?) AND id <> ?::uuid",
+                (fields["nome"], local_id),
+            ).fetchone()
+            if dup:
+                raise ValueError("Já existe um local com esse nome")
+        sets = ", ".join(f"{k}=?" for k in fields)
+        params = list(fields.values()) + [local_id]
+        conn.execute(f"UPDATE locais SET {sets} WHERE id = ?::uuid", tuple(params))
+        row = conn.execute(
+            "SELECT * FROM locais WHERE id = ?::uuid", (local_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("Local não encontrado")
+        updated = _local_public(row)
+        add_audit(
+            projeto_id=None,
+            entidade="local",
+            entidade_id=local_id,
+            acao="editar",
+            usuario=usuario,
+            detalhes=fields,
+            conn=conn,
+        )
+        return updated
+
+
+def delete_local(local_id: str, *, usuario: dict | None = None) -> bool:
+    require_postgres()
+    with connect() as conn:
+        init_db(conn)
+        used = conn.execute(
+            "SELECT 1 AS ok FROM salas WHERE local_id = ?::uuid LIMIT 1",
+            (local_id,),
+        ).fetchone()
+        if used:
+            conn.execute(
+                "UPDATE locais SET ativo = FALSE WHERE id = ?::uuid", (local_id,)
+            )
+            add_audit(
+                projeto_id=None,
+                entidade="local",
+                entidade_id=local_id,
+                acao="desativar",
+                usuario=usuario,
+                conn=conn,
+            )
+            return True
+        cur = conn.execute("DELETE FROM locais WHERE id = ?::uuid", (local_id,))
+        if cur.rowcount == 0:
+            return False
+        add_audit(
+            projeto_id=None,
+            entidade="local",
+            entidade_id=local_id,
             acao="excluir",
             usuario=usuario,
             conn=conn,

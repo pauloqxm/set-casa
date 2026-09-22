@@ -40,9 +40,9 @@ Após rodar o script, os alertas de RLS devem sumir em até 24 h.
 
 ### Agendamento de salas
 
-1. Faça o deploy (as tabelas `salas`, `coordenacoes` e `agendamentos` nascem no `init_db`).
+1. Faça o deploy (as tabelas `locais`, `salas`, `coordenacoes` e `agendamentos` nascem no `init_db`).
 2. Supabase → **SQL Editor** → execute [`supabase/agendamento_salas.sql`](supabase/agendamento_salas.sql)
-   (extensão `btree_gist`, constraint `sem_conflito` e RLS das três tabelas).
+   (extensão `btree_gist`, constraint `sem_conflito`, coluna `salas.local_id` e RLS).
 3. Para desfazer só este módulo: [`supabase/rollback_agendamento_salas.sql`](supabase/rollback_agendamento_salas.sql)
    e checkout da branch `backup-antes-agendamento-salas`.
 

@@ -48,6 +48,17 @@
   gap: 8px;
 }
 
+.salas-local-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.salas-local-filter select,
 .salas-date-visible {
   appearance: none;
   font: inherit;
@@ -57,9 +68,18 @@
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   min-height: 34px;
   cursor: pointer;
+}
+
+.salas-local-filter select {
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.salas-date-visible {
+  padding: 6px 10px;
 }
 
 .salas-days {

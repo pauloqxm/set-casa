@@ -679,6 +679,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "ok": True,
                     "agendamentos": agendamentos,
                     "salas": salas if pode_gerenciar else ativas,
+                    "locais": db.list_locais(somente_ativos=not pode_gerenciar),
                     "coordenacoes": db.list_coordenacoes(),
                     "kpis": kpis,
                     "slots": [{"inicio": a, "fim": b} for a, b in db.SLOTS_AGENDA],
@@ -699,6 +700,22 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": str(exc)}, 400)
                 return
             self._send_json({"ok": True, "salas": salas})
+            return
+
+        if path == "/api/locais":
+            if not self._require_postgres():
+                return
+            user = self._current_user()
+            todas = bool(user and db.pode_editar(user.get("papel", "")))
+            try:
+                self._send_json(
+                    {
+                        "ok": True,
+                        "locais": db.list_locais(somente_ativos=not todas),
+                    }
+                )
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
             return
 
         if path == "/api/coordenacoes":
@@ -1008,6 +1025,25 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "sala": updated})
             return
 
+        local_match = re.fullmatch(r"/api/locais/([^/]+)", path)
+        if local_match:
+            if not self._require_postgres() or not self._require_editor():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                updated = db.update_local(
+                    local_match.group(1), body, usuario=self._current_user()
+                )
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "local": updated})
+            return
+
         coord_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
         if coord_match:
             if not self._require_postgres() or not self._require_editor():
@@ -1204,6 +1240,16 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": "Sala não encontrada"}, 404)
                 return
             self._send_json({"ok": True, "removido": sala_del_match.group(1)})
+            return
+
+        local_del_match = re.fullmatch(r"/api/locais/([^/]+)", path)
+        if local_del_match:
+            if not self._require_postgres() or not self._require_editor():
+                return
+            if not db.delete_local(local_del_match.group(1), usuario=self._current_user()):
+                self._send_json({"ok": False, "erro": "Local não encontrado"}, 404)
+                return
+            self._send_json({"ok": True, "removido": local_del_match.group(1)})
             return
 
         coord_del_match = re.fullmatch(r"/api/coordenacoes/([^/]+)", path)
@@ -1422,6 +1468,22 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "erro": str(exc)}, 400)
                 return
             self._send_json({"ok": True, "sala": created}, status=201)
+            return
+
+        if path == "/api/locais":
+            if not self._require_postgres() or not self._require_editor():
+                return
+            try:
+                body = self._read_json()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "erro": "JSON inválido"}, 400)
+                return
+            try:
+                created = db.create_local(body, usuario=self._current_user())
+            except ValueError as exc:
+                self._send_json({"ok": False, "erro": str(exc)}, 400)
+                return
+            self._send_json({"ok": True, "local": created}, status=201)
             return
 
         if path == "/api/coordenacoes":

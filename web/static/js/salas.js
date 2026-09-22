@@ -13,14 +13,24 @@
     btnSemanaProx: document.getElementById("btnSemanaProx"),
     btnHoje: document.getElementById("btnHoje"),
     irParaData: document.getElementById("irParaData"),
+    filtroLocal: document.getElementById("filtroLocal"),
     diasTabs: document.getElementById("diasTabs"),
     grade: document.getElementById("grade"),
     gradeEmpty: document.getElementById("gradeEmpty"),
+    adminLocais: document.getElementById("adminLocais"),
     adminSalas: document.getElementById("adminSalas"),
     adminCoords: document.getElementById("adminCoords"),
+    formLocal: document.getElementById("formLocal"),
+    localId: document.getElementById("localId"),
+    localNome: document.getElementById("localNome"),
+    localEndereco: document.getElementById("localEndereco"),
+    btnCancelarLocal: document.getElementById("btnCancelarLocal"),
+    btnSalvarLocal: document.getElementById("btnSalvarLocal"),
+    listaLocais: document.getElementById("listaLocais"),
     formSala: document.getElementById("formSala"),
     salaId: document.getElementById("salaId"),
     salaNome: document.getElementById("salaNome"),
+    salaLocal: document.getElementById("salaLocal"),
     salaAndar: document.getElementById("salaAndar"),
     salaCapacidade: document.getElementById("salaCapacidade"),
     salaRecursos: document.getElementById("salaRecursos"),
@@ -59,6 +69,8 @@
     selectedDate: isoDate(new Date()),
     slots: [],
     salas: [],
+    locais: [],
+    localId: "",
     coordenacoes: [],
     agendamentos: [],
     podeAdmin: false,
@@ -159,6 +171,73 @@
       );
     });
     if (selected) select.value = selected;
+  }
+
+  function salasVisiveis() {
+    return state.salas.filter(
+      (s) => s.ativo && (!state.localId || s.local_id === state.localId)
+    );
+  }
+
+  function computeKpis() {
+    const salas = salasVisiveis();
+    const ids = new Set(salas.map((s) => s.id));
+    const confirmados = state.agendamentos.filter(
+      (a) => a.status === "confirmado" && ids.has(a.sala_id)
+    );
+    const bySala = {};
+    const byHora = {};
+    confirmados.forEach((item) => {
+      bySala[item.sala_id] = (bySala[item.sala_id] || 0) + 1;
+      if (item.hora_inicio) byHora[item.hora_inicio] = (byHora[item.hora_inicio] || 0) + 1;
+    });
+    let salaMais = null;
+    const salaIds = Object.keys(bySala);
+    if (salaIds.length) {
+      const topId = salaIds.reduce((a, b) => (bySala[a] >= bySala[b] ? a : b));
+      const sala = salas.find((s) => s.id === topId);
+      const nome =
+        (sala && sala.nome) ||
+        (confirmados.find((a) => a.sala_id === topId) || {}).sala_nome ||
+        "—";
+      salaMais = { id: topId, nome, total: bySala[topId] };
+    }
+    let horarioPico = null;
+    const horas = Object.keys(byHora);
+    if (horas.length) {
+      const topHora = horas.reduce((a, b) => (byHora[a] >= byHora[b] ? a : b));
+      horarioPico = { hora: topHora, total: byHora[topHora] };
+    }
+    let diasUteis = 0;
+    const start = state.weekStart;
+    for (let i = 0; i < 7; i += 1) {
+      const d = addDays(start, i);
+      if (d.getDay() !== 0 && d.getDay() !== 6) diasUteis += 1;
+    }
+    const capacidade = salas.length * (state.slots.length || 8) * diasUteis;
+    const ocupacao = capacidade ? Math.round((1000 * confirmados.length) / capacidade) / 10 : 0;
+    return {
+      total: confirmados.length,
+      ocupacao_pct: ocupacao,
+      sala_mais_usada: salaMais,
+      horario_pico: horarioPico,
+    };
+  }
+
+  function renderFiltroLocal() {
+    if (!el.filtroLocal) return;
+    const atual = state.localId;
+    const opcoes = state.locais
+      .filter((l) => l.ativo)
+      .map((l) => ({ value: l.id, label: l.nome }));
+    fillSelect(el.filtroLocal, opcoes, {
+      emptyLabel: "Todos os locais",
+      selected: atual,
+    });
+    if (atual && !opcoes.some((o) => o.value === atual)) {
+      state.localId = "";
+      el.filtroLocal.value = "";
+    }
   }
 
   function renderKpis(kpis) {
@@ -262,11 +341,14 @@
   }
 
   function renderGrid() {
-    const salas = state.salas.filter((s) => s.ativo);
+    const salas = salasVisiveis();
     const thead = el.grade.querySelector("thead");
     const tbody = el.grade.querySelector("tbody");
     if (!salas.length) {
       el.gradeEmpty.hidden = false;
+      el.gradeEmpty.textContent = state.localId
+        ? "Nenhuma sala ativa neste local."
+        : "Nenhuma sala ativa. Um administrador precisa cadastrar as salas.";
       thead.innerHTML = "";
       tbody.innerHTML = "";
       return;
@@ -308,16 +390,45 @@
 
   function renderAdmin() {
     const show = state.podeGerenciar;
+    if (el.adminLocais) el.adminLocais.hidden = !show;
     el.adminSalas.hidden = !show;
     el.adminCoords.hidden = !show;
     if (!show) return;
+    if (el.salaLocal) {
+      fillSelect(
+        el.salaLocal,
+        state.locais.map((l) => ({ value: l.id, label: l.nome })),
+        { emptyLabel: "— Selecione —", selected: el.salaLocal.value }
+      );
+    }
+    if (el.listaLocais) {
+      el.listaLocais.innerHTML = state.locais
+        .map(
+          (l) => `
+      <div class="salas-admin-item${l.ativo ? "" : " is-inactive"}">
+        <div>
+          <strong>${escapeHtml(l.nome)}</strong>
+          <span>${escapeHtml(l.endereco || "sem endereço")}</span>
+        </div>
+        <div class="salas-admin-actions">
+          <button type="button" class="btn-ghost btn-small" data-edit-local="${escapeAttr(
+            l.id
+          )}">Editar</button>
+          <button type="button" class="btn-ghost btn-small" data-del-local="${escapeAttr(
+            l.id
+          )}">${l.ativo ? "Desativar" : "Excluir"}</button>
+        </div>
+      </div>`
+        )
+        .join("");
+    }
     el.listaSalas.innerHTML = state.salas
       .map(
         (s) => `
       <div class="salas-admin-item${s.ativo ? "" : " is-inactive"}">
         <div>
           <strong>${escapeHtml(s.nome)}</strong>
-          <span>${escapeHtml(s.andar || "—")} · ${
+          <span>${escapeHtml(s.local_nome || "sem local")} · ${escapeHtml(s.andar || "—")} · ${
             s.capacidade != null ? `${s.capacidade} lugares` : "capacidade —"
           } · ${(s.recursos || []).join(", ") || "sem recursos"}</span>
         </div>
@@ -364,9 +475,17 @@
     el.modalErro.hidden = true;
     el.modalErro.textContent = "";
     el.formAgenda.reset();
+    const salasModal = state.salas.filter((s) => {
+      if (!s.ativo && s.id !== preset.sala_id) return false;
+      if (!state.localId) return true;
+      return s.local_id === state.localId || s.id === preset.sala_id;
+    });
     fillSelect(
       el.agendaSala,
-      state.salas.filter((s) => s.ativo).map((s) => ({ value: s.id, label: s.nome })),
+      salasModal.map((s) => ({
+        value: s.id,
+        label: s.local_nome ? `${s.nome} · ${s.local_nome}` : s.nome,
+      })),
       { emptyLabel: "— Selecione —", selected: preset.sala_id || "" }
     );
     fillSelect(
@@ -412,6 +531,7 @@
     const ate = isoDate(addDays(state.weekStart, 6));
     const data = await api(`/api/agendamentos?de=${de}&ate=${ate}`);
     state.salas = data.salas || [];
+    state.locais = data.locais || [];
     state.coordenacoes = data.coordenacoes || [];
     state.agendamentos = data.agendamentos || [];
     state.slots = data.slots || [];
@@ -429,7 +549,8 @@
         { inicio: "16:00", fim: "17:00" },
       ];
     }
-    renderKpis(data.kpis);
+    renderFiltroLocal();
+    renderKpis(computeKpis());
     renderDays();
     renderGrid();
     renderAdmin();
@@ -583,6 +704,22 @@
     el.irParaData.addEventListener("change", () => irParaDia(el.irParaData.value));
   }
 
+  if (el.filtroLocal) {
+    el.filtroLocal.addEventListener("change", () => {
+      state.localId = el.filtroLocal.value || "";
+      renderKpis(computeKpis());
+      renderGrid();
+    });
+  }
+
+  function resetLocalForm() {
+    if (!el.formLocal) return;
+    el.formLocal.reset();
+    if (el.localId) el.localId.value = "";
+    if (el.btnCancelarLocal) el.btnCancelarLocal.hidden = true;
+    if (el.btnSalvarLocal) el.btnSalvarLocal.textContent = "Salvar local";
+  }
+
   function resetSalaForm() {
     el.formSala.reset();
     if (el.salaId) el.salaId.value = "";
@@ -597,9 +734,19 @@
     if (el.btnSalvarCoord) el.btnSalvarCoord.textContent = "Salvar coordenação";
   }
 
+  function preencherLocal(local) {
+    el.localId.value = local.id;
+    el.localNome.value = local.nome || "";
+    el.localEndereco.value = local.endereco || "";
+    el.btnCancelarLocal.hidden = false;
+    el.btnSalvarLocal.textContent = "Atualizar local";
+    el.localNome.focus();
+  }
+
   function preencherSala(sala) {
     el.salaId.value = sala.id;
     el.salaNome.value = sala.nome || "";
+    if (el.salaLocal) el.salaLocal.value = sala.local_id || "";
     el.salaAndar.value = sala.andar || "";
     el.salaCapacidade.value = sala.capacidade ?? "";
     el.salaRecursos.value = (sala.recursos || []).join(", ");
@@ -621,6 +768,7 @@
     event.preventDefault();
     const payload = {
       nome: el.salaNome.value.trim(),
+      local_id: el.salaLocal ? el.salaLocal.value : "",
       andar: el.salaAndar.value.trim(),
       capacidade: el.salaCapacidade.value,
       recursos: el.salaRecursos.value,
@@ -646,6 +794,36 @@
       window.alert(err.message || "Erro ao salvar sala");
     }
   });
+
+  if (el.formLocal) {
+    el.formLocal.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = {
+        nome: el.localNome.value.trim(),
+        endereco: el.localEndereco.value.trim(),
+      };
+      const id = el.localId.value;
+      try {
+        if (id) {
+          await api(`/api/locais/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          });
+          showToast("Local atualizado.");
+        } else {
+          await api("/api/locais", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          showToast("Local cadastrado.");
+        }
+        resetLocalForm();
+        await loadAgenda();
+      } catch (err) {
+        window.alert(err.message || "Erro ao salvar local");
+      }
+    });
+  }
 
   el.formCoord.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -675,11 +853,36 @@
     }
   });
 
+  if (el.btnCancelarLocal) {
+    el.btnCancelarLocal.addEventListener("click", resetLocalForm);
+  }
   if (el.btnCancelarSala) {
     el.btnCancelarSala.addEventListener("click", resetSalaForm);
   }
   if (el.btnCancelarCoord) {
     el.btnCancelarCoord.addEventListener("click", resetCoordForm);
+  }
+
+  if (el.listaLocais) {
+    el.listaLocais.addEventListener("click", async (event) => {
+      const editBtn = event.target.closest("[data-edit-local]");
+      if (editBtn) {
+        const local = state.locais.find((l) => l.id === editBtn.dataset.editLocal);
+        if (local) preencherLocal(local);
+        return;
+      }
+      const btn = event.target.closest("[data-del-local]");
+      if (!btn) return;
+      if (!window.confirm("Desativar ou excluir este local?")) return;
+      try {
+        await api(`/api/locais/${encodeURIComponent(btn.dataset.delLocal)}`, {
+          method: "DELETE",
+        });
+        await loadAgenda();
+      } catch (err) {
+        window.alert(err.message || "Erro ao remover local");
+      }
+    });
   }
 
   el.listaSalas.addEventListener("click", async (event) => {

@@ -16,6 +16,7 @@ ALTER TABLE IF EXISTS public.notificacoes_tarefa ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.salas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.coordenacoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.agendamentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.locais ENABLE ROW LEVEL SECURITY;
 
 -- Sem políticas para anon/authenticated = API REST bloqueada.
 -- Não crie policies "USING (true)" aqui — isso reabriria o acesso público.

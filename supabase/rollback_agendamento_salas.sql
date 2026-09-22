@@ -8,3 +8,4 @@ ALTER TABLE IF EXISTS public.agendamentos DROP CONSTRAINT IF EXISTS sem_conflito
 DROP TABLE IF EXISTS public.agendamentos;
 DROP TABLE IF EXISTS public.coordenacoes;
 DROP TABLE IF EXISTS public.salas;
+DROP TABLE IF EXISTS public.locais;
